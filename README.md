@@ -18,6 +18,7 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 ### Prerequisites
 
 - Node.js 16+ installed
+- Python 3.8+ installed
 - Google Ads API credentials (optional - works with mock data otherwise)
 - Gemini API key (optional - falls back to traditional NLP)
 
@@ -25,88 +26,135 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 
 1. **Clone the repository**
    ```bash
-   git clone <your-repo-url>
-   cd keyword-researcher
+   git clone https://github.com/flin-agency/keyword-research-tool.git
+   cd keyword-research-tool
    ```
 
-2. **Install dependencies**
+2. **Install Node.js dependencies**
    ```bash
    npm install
    ```
 
-3. **Install Playwright browsers** (for web scraping)
+3. **Install Python dependencies** (for Google Ads API v21)
+   ```bash
+   cd python-ads-service
+   pip3 install -r requirements.txt
+   cd ..
+   ```
+
+4. **Install Playwright browsers** (for web scraping)
    ```bash
    npx playwright install
    ```
 
-4. **Set up environment variables**
+5. **Set up environment variables**
+
+   **Main service:**
    ```bash
    cp .env.example .env
    ```
-   
-   Edit `.env` and add your API credentials:
+
+   **Python microservice:**
+   ```bash
+   cp python-ads-service/.env.example python-ads-service/.env
+   ```
+
+   Edit both `.env` files and add your API credentials:
    - **Google Ads API**: Get credentials from [Google Ads API Setup](https://developers.google.com/google-ads/api/docs/first-call/overview)
    - **Gemini API**: Get your key from [Google AI Studio](https://aistudio.google.com/app/apikey)
 
-5. **Start the server**
+6. **Start both services**
+
+   **Terminal 1 - Python microservice (port 5001):**
    ```bash
-   npm start
+   cd python-ads-service
+   PYTHON_SERVICE_PORT=5001 python3 app.py
    ```
 
-6. **Open your browser**
+   **Terminal 2 - Node.js server (port 3000):**
+   ```bash
+   npm run start:improved
+   ```
+
+7. **Open your browser**
    Navigate to `http://localhost:3000`
 
 ## 📋 Environment Variables
 
+### Main Service (.env)
+
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `PORT` | Server port (default: 3000) | No |
-| `GOOGLE_ADS_DEVELOPER_TOKEN` | Your Google Ads developer token | No* |
-| `GOOGLE_ADS_CLIENT_ID` | OAuth 2.0 client ID | No* |
-| `GOOGLE_ADS_CLIENT_SECRET` | OAuth 2.0 client secret | No* |
-| `GOOGLE_ADS_REFRESH_TOKEN` | OAuth 2.0 refresh token | No* |
-| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | Your Google Ads customer ID | No* |
+| `GOOGLE_ADS_DEVELOPER_TOKEN` | Your Google Ads developer token | Yes* |
+| `GOOGLE_ADS_CLIENT_ID` | OAuth 2.0 client ID | Yes* |
+| `GOOGLE_ADS_CLIENT_SECRET` | OAuth 2.0 client secret | Yes* |
+| `GOOGLE_ADS_REFRESH_TOKEN` | OAuth 2.0 refresh token | Yes* |
+| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | Your Google Ads customer ID | Yes* |
 | `GEMINI_API_KEY` | Gemini AI API key | No** |
 | `MAX_PAGES_TO_SCAN` | Maximum pages to crawl per website (default: 20) | No |
 | `MAX_KEYWORDS` | Maximum keywords to extract (default: 500) | No |
 | `MIN_SEARCH_VOLUME` | Minimum monthly search volume (default: 10) | No |
+| `PYTHON_SERVICE_URL` | Python microservice URL (default: http://localhost:5001) | No |
+| `PYTHON_SERVICE_PORT` | Python service port (default: 5001) | No |
 
-\* Without Google Ads API credentials, the tool uses mock data for testing  
+### Python Microservice (python-ads-service/.env)
+
+Same Google Ads API credentials as above, plus:
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `PYTHON_SERVICE_PORT` | Port for Python service (default: 5001) | No |
+
+\* Without Google Ads API credentials, the tool uses mock data for testing
 \*\* Without Gemini API key, the tool falls back to traditional NLP extraction
 
 ## 🏗️ Project Structure
 
 ```
-keyword-researcher/
+keyword-research-tool/
 ├── backend/
 │   ├── api/
-│   │   └── research.js          # Main API endpoints
+│   │   └── research-improved.js     # Main API endpoints
 │   ├── services/
-│   │   ├── scraper-v2.js        # Multi-strategy web scraping
-│   │   ├── keyword-extractor.js # AI + NLP keyword extraction
-│   │   ├── google-ads.js        # Google Ads API integration
-│   │   ├── clustering.js        # ML-based topic clustering
-│   │   ├── gemini.js            # Gemini AI service
-│   │   └── exporter.js          # CSV/JSON export
+│   │   ├── scraper-unified.js       # Multi-strategy web scraping
+│   │   ├── keyword-extractor.js     # AI + NLP keyword extraction
+│   │   ├── google-ads-python.js     # Python microservice client
+│   │   ├── clustering-improved.js   # ML-based topic clustering
+│   │   ├── gemini.js                # Gemini AI service
+│   │   └── exporter.js              # CSV/JSON export
 │   ├── utils/
-│   │   └── demo-data.js         # Demo/fallback data
-│   └── server.js                # Express server
+│   │   └── demo-data.js             # Demo/fallback data
+│   └── server-improved.js           # Express server
+├── python-ads-service/              # Python microservice (Google Ads API v21)
+│   ├── app.py                       # Flask service
+│   ├── requirements.txt             # Python dependencies
+│   └── .env.example                 # Python service env template
 ├── frontend/
 │   └── public/
-│       ├── index.html           # Web interface
-│       └── app.js               # Frontend logic
+│       ├── index.html               # Web interface
+│       └── app.js                   # Frontend logic
 ├── tests/
-│   └── *.test.js                # Unit tests
-├── .env.example                 # Environment template
+│   └── *.test.js                    # Unit tests
+├── .env.example                     # Main service env template
 ├── package.json
 └── README.md
 ```
 
 ## 🔧 How It Works
 
+### Architecture
+
+The tool uses a **microservice architecture** with two main components:
+
+1. **Node.js Service (port 3000)** - Main application server handling web scraping, keyword extraction, clustering, and UI
+2. **Python Microservice (port 5001)** - Dedicated service for Google Ads API v21 integration using official Python client library
+
+### Workflow
+
 1. **Website Scanning** - Scrapes your target website using Playwright/Axios
 2. **AI Keyword Extraction** - Gemini AI analyzes content and extracts marketing-relevant keywords
-3. **Google Ads Enrichment** - Fetches real search volumes, CPC, and competition data
+3. **Google Ads Enrichment** - Node.js service calls Python microservice which fetches real search volumes, CPC, and competition data from Google Ads API v21
 4. **Smart Clustering** - Groups keywords into topics using K-Means ML algorithm
 5. **AI Enhancement** - Gemini refines cluster names and provides content strategies
 6. **Results Display** - Shows organized topics with full metrics and export options
@@ -184,20 +232,20 @@ English, German, French, Italian, Spanish, Dutch, Portuguese, Polish, Russian, J
 
 ## 📦 Dependencies
 
-### Core
+### Node.js Service
 - **Express** - Web server
 - **Playwright** - Robust web scraping
 - **Axios + Cheerio** - Fallback scraping
-
-### AI & NLP
 - **@google/generative-ai** - Gemini AI integration
-- **google-ads-api** - Google Ads Keyword Planner
 - **natural** - NLP processing
 - **compromise** - POS tagging
 - **stopword** - Stopword removal
-
-### Machine Learning
 - **ml-kmeans** - Topic clustering
+
+### Python Microservice
+- **Flask** - Python web server
+- **google-ads** (v28.0.0) - Google Ads API v21 client
+- **python-dotenv** - Environment configuration
 
 ### Testing
 - **Jest** - Testing framework

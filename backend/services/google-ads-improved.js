@@ -1,4 +1,4 @@
-const { GoogleAdsApi } = require('google-ads-api');
+const { GoogleAdsApi, services } = require('google-ads-api');
 
 const MAX_KEYWORDS = parseInt(process.env.MAX_KEYWORDS) || 500;
 const MIN_SEARCH_VOLUME = parseInt(process.env.MIN_SEARCH_VOLUME) || 10;
@@ -91,14 +91,17 @@ async function getKeywordMetrics(seedKeywords, country = '2756', languageCode = 
     for (let i = 0; i < seedKeywords.length; i += batchSize) {
       const batch = seedKeywords.slice(i, i + batchSize);
 
+      const keywordSeed = new services.KeywordSeed({
+        keywords: batch,
+      });
+
       const ideas = await customer.keywordPlanIdeas.generateKeywordIdeas({
         customer_id: customerId,
-        keyword_seed: {
-          keywords: batch,
-        },
+        keyword_seed: keywordSeed,
         geo_target_constants: [`geoTargetConstants/${country}`],
-        language: { language_constant: language },
+        language,
         include_adult_keywords: false,
+        keyword_plan_network: 'GOOGLE_SEARCH',
       });
 
       ideas.forEach((idea) => {
@@ -143,60 +146,7 @@ function mapCompetition(competition) {
   return competitionMap[competition] || 'unknown';
 }
 
-/**
- * Generate mock keyword data (for testing without API)
- */
-function getMockKeywordData(seedKeywords) {
-  const mockData = [];
-
-  seedKeywords.forEach((keyword) => {
-    // Base keyword
-    const baseCpc = parseFloat((Math.random() * 5 + 0.5).toFixed(2));
-    const baseCpcHigh = parseFloat((baseCpc + Math.random() * 4 + 2).toFixed(2));
-
-    mockData.push({
-      keyword,
-      searchVolume: Math.floor(Math.random() * 10000) + 100,
-      competition: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)],
-      cpc: baseCpc,
-      cpcHigh: baseCpcHigh,
-    });
-
-    // Add related variations (1-3 per seed keyword)
-    const variations = Math.floor(Math.random() * 3) + 1;
-    for (let i = 0; i < variations; i++) {
-      const suffixes = [
-        'guide',
-        'tips',
-        'best',
-        'how to',
-        'tutorial',
-        'free',
-        'online',
-        '2024',
-        'for beginners',
-        'services',
-      ];
-      const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-
-      const cpcLow = parseFloat((Math.random() * 4 + 0.3).toFixed(2));
-      const cpcHigh = parseFloat((cpcLow + Math.random() * 3 + 1).toFixed(2));
-
-      mockData.push({
-        keyword: `${keyword} ${suffix}`,
-        searchVolume: Math.floor(Math.random() * 5000) + 50,
-        competition: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)],
-        cpc: cpcLow,
-        cpcHigh: cpcHigh,
-      });
-    }
-  });
-
-  return mockData.slice(0, MAX_KEYWORDS);
-}
-
 module.exports = {
   getKeywordMetrics,
-  getMockKeywordData,
   initializeClient,
 };

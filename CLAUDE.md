@@ -53,6 +53,7 @@ This is a keyword research tool that scans websites, queries Google Ads Keyword 
 - Document API setup requirements
 - Consider rate limits and API costs
 - Cache results where possible
+- **CRITICAL: NO MOCK DATA** - Never use mock/demo/fallback data. If APIs fail, report the actual error to the user. Real data only.
 
 ### No Permission Required For
 - Creating any project files

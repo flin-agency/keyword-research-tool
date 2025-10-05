@@ -44,10 +44,7 @@ async function getKeywordMetrics(seedKeywords, country = '2756', languageCode = 
       throw new Error('GOOGLE_ADS_LOGIN_CUSTOMER_ID not configured');
     }
 
-    const customer = adsClient.Customer({
-      customer_id: customerId,
-      refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN
-    });
+    const customer = adsClient.Customer({ customer_id: customerId });
 
     // Batch keywords to avoid API limits
     const batchSize = 50;
@@ -91,7 +88,7 @@ async function getKeywordMetrics(seedKeywords, country = '2756', languageCode = 
     for (let i = 0; i < seedKeywords.length; i += batchSize) {
       const batch = seedKeywords.slice(i, i + batchSize);
 
-      const ideas = await customer.keywordPlanIdeas.generateKeywordIdeas({
+      const ideas = await customer.keywordPlanIdeaService.generateKeywordIdeas({
         customer_id: customerId,
         keyword_seed: {
           keywords: batch,

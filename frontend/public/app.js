@@ -2,9 +2,22 @@ const API_URL = 'http://localhost:3000/api';
 
 let currentJobId = null;
 
-document.getElementById('startBtn').addEventListener('click', startResearch);
-document.getElementById('exportCsv').addEventListener('click', () => exportResults('csv'));
-document.getElementById('exportJson').addEventListener('click', () => exportResults('json'));
+// Wait for DOM to be ready
+document.addEventListener('DOMContentLoaded', () => {
+  const startBtn = document.getElementById('startBtn');
+  const exportCsv = document.getElementById('exportCsv');
+  const exportJson = document.getElementById('exportJson');
+
+  if (startBtn) {
+    startBtn.addEventListener('click', startResearch);
+  }
+  if (exportCsv) {
+    exportCsv.addEventListener('click', () => exportResults('csv'));
+  }
+  if (exportJson) {
+    exportJson.addEventListener('click', () => exportResults('json'));
+  }
+});
 
 async function startResearch() {
   const url = document.getElementById('urlInput').value.trim();

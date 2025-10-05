@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keyword Research Tool</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 40px;
+      position: relative;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+
+    .settings-btn {
+      position: absolute;
+      right: 0;
+      top: 0;
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid white;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.3s;
+    }
+
+    .settings-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .input-group input {
+      flex: 1;
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+
+    .input-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .btn {
+      padding: 15px 30px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .btn:hover {
+      background: #5568d3;
+    }
+
+    .btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+    }
+
+    .btn-secondary:hover {
+      background: #5a6268;
+    }
+
+    .btn-success {
+      background: #28a745;
+    }
+
+    .btn-success:hover {
+      background: #218838;
+    }
+
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      animation: fadeIn 0.3s;
+    }
+
+    .modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-content {
+      background-color: white;
+      padding: 30px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: slideIn 0.3s;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .modal-header h2 {
+      color: #333;
+      font-size: 1.5rem;
+    }
+
+    .close {
+      color: #aaa;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+      line-height: 20px;
+    }
+
+    .close:hover,
+    .close:focus {
+      color: #000;
+    }
+
+    .settings-section {
+      margin-bottom: 25px;
+    }
+
+    .settings-section h3 {
+      color: #667eea;
+      margin-bottom: 15px;
+      font-size: 1.1rem;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      color: #555;
+      font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-family: inherit;
+    }
+
+    .form-group textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .form-group small {
+      display: block;
+      margin-top: 5px;
+      color: #666;
+      font-size: 0.85rem;
+    }
+
+    .api-status {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-left: 10px;
+    }
+
+    .api-status.configured {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .api-status.not-configured {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 2px solid #e0e0e0;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateY(-50px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .progress-container {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .progress-bar {
+      height: 30px;
+      background: #f0f0f0;
+      border-radius: 15px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+
+    .progress-text {
+      margin-top: 10px;
+      text-align: center;
+      color: #666;
+    }
+
+    .warning-banner {
+      background: #fff3cd;
+      color: #856404;
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      display: none;
+    }
+
+    .warning-banner.visible {
+      display: block;
+    }
+
+    .results {
+      display: none;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-card .number {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .stat-card .label {
+      opacity: 0.9;
+    }
+
+    .cluster {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .cluster-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      cursor: pointer;
+    }
+
+    .cluster-title {
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .cluster-badge {
+      background: #667eea;
+      color: white;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+    }
+
+    .cluster-meta {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    .keywords-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    .keywords-table th {
+      background: #667eea;
+      color: white;
+      padding: 12px;
+      text-align: left;
+      font-weight: 500;
+    }
+
+    .keywords-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .keywords-table tr:hover {
+      background: #f5f5f5;
+    }
+
+    .competition-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .competition-low {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .competition-medium {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .competition-high {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .export-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+
+    .success {
+      background: #d4edda;
+      color: #155724;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    select {
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      background: white;
+      cursor: pointer;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <button class="settings-btn" id="settingsBtn">⚙️ API Settings</button>
+      <h1>🔍 Keyword Research Tool</h1>
+      <p>Discover valuable keywords and topic clusters for your website</p>
+    </div>
+
+    <div class="card">
+      <div id="apiWarning" class="warning-banner">
+        ⚠️ Google Ads API not configured. Results will use simulated data. Configure API in Settings to get real data.
+      </div>
+
+      <div class="input-group">
+        <input
+          type="text"
+          id="urlInput"
+          placeholder="Enter website URL (e.g., example.com)"
+          value=""
+        />
+        <select id="countrySelect">
+          <option value="2756">🇨🇭 Switzerland</option>
+          <option value="2276">🇩🇪 Germany</option>
+          <option value="2040">🇦🇹 Austria</option>
+          <option value="2250">🇫🇷 France</option>
+          <option value="2380">🇮🇹 Italy</option>
+          <option value="2826">🇬🇧 United Kingdom</option>
+          <option value="2840" selected>🇺🇸 United States</option>
+          <option value="2124">🇨🇦 Canada</option>
+          <option value="2528">🇳🇱 Netherlands</option>
+          <option value="2056">🇧🇪 Belgium</option>
+          <option value="2724">🇪🇸 Spain</option>
+        </select>
+        <select id="languageSelect">
+          <option value="">Auto (by country)</option>
+          <option value="en">🇬🇧 English</option>
+          <option value="de">🇩🇪 German</option>
+          <option value="fr">🇫🇷 French</option>
+          <option value="it">🇮🇹 Italian</option>
+          <option value="es">🇪🇸 Spanish</option>
+          <option value="nl">🇳🇱 Dutch</option>
+          <option value="pt">🇵🇹 Portuguese</option>
+          <option value="pl">🇵🇱 Polish</option>
+          <option value="ru">🇷🇺 Russian</option>
+          <option value="ja">🇯🇵 Japanese</option>
+          <option value="zh">🇨🇳 Chinese</option>
+        </select>
+        <button class="btn" id="startBtn">Start Research</button>
+      </div>
+
+      <div class="progress-container" id="progressContainer">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill">0%</div>
+        </div>
+        <div class="progress-text" id="progressText">Initializing...</div>
+      </div>
+
+      <div id="messageContainer"></div>
+    </div>
+
+    <div class="results" id="results">
+      <div class="card">
+        <h2>Summary</h2>
+        <div class="summary" id="summary"></div>
+
+        <div class="export-buttons">
+          <button class="btn" id="exportCsv">Export CSV</button>
+          <button class="btn" id="exportJson">Export JSON</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Topic Clusters</h2>
+        <div id="clusters"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>API Settings</h2>
+        <span class="close" id="closeModal">&times;</span>
+      </div>
+
+      <div class="settings-section">
+        <h3>Google Ads API
+          <span id="googleAdsStatus" class="api-status">Not Configured</span>
+        </h3>
+        <div class="form-group">
+          <label for="developerToken">Developer Token</label>
+          <input type="text" id="developerToken" placeholder="Your Google Ads developer token">
+          <small>Get from Google Ads API Center</small>
+        </div>
+        <div class="form-group">
+          <label for="clientId">Client ID</label>
+          <input type="text" id="clientId" placeholder="OAuth2 Client ID">
+          <small>From Google Cloud Console</small>
+        </div>
+        <div class="form-group">
+          <label for="clientSecret">Client Secret</label>
+          <input type="password" id="clientSecret" placeholder="OAuth2 Client Secret">
+          <small>From Google Cloud Console</small>
+        </div>
+        <div class="form-group">
+          <label for="refreshToken">Refresh Token</label>
+          <textarea id="refreshToken" placeholder="OAuth2 Refresh Token"></textarea>
+          <small>Generate using OAuth2 flow with Google Ads scope</small>
+        </div>
+        <div class="form-group">
+          <label for="loginCustomerId">Login Customer ID (Manager Account)</label>
+          <input type="text" id="loginCustomerId" placeholder="123-456-7890">
+          <small>Your Google Ads manager account ID (without dashes)</small>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Gemini AI
+          <span id="geminiStatus" class="api-status">Not Configured</span>
+        </h3>
+        <div class="form-group">
+          <label for="geminiApiKey">API Key</label>
+          <input type="password" id="geminiApiKey" placeholder="Your Gemini API key">
+          <small>Get from Google AI Studio</small>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <div>
+          <button class="btn btn-secondary" id="testConnection">Test Connection</button>
+        </div>
+        <div class="button-group">
+          <button class="btn btn-secondary" id="cancelSettings">Cancel</button>
+          <button class="btn btn-success" id="saveSettings">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app-improved.js"></script>
+</body>
+</html>

@@ -246,7 +246,7 @@ async function generateContentBrief(cluster, websiteContext) {
     const ai = initializeGemini();
     if (!ai) return null;
 
-    const model = ai.getGenerativeAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
     const topKeywords = cluster.keywords.slice(0, 15).map((k) => ({
       keyword: k.keyword,
