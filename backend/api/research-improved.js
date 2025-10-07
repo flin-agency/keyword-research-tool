@@ -359,6 +359,7 @@ async function processResearch(jobId, url, country = '2756', language = null, op
       url,
       country: country,
       language: resolvedLanguage,
+      requestedLanguage: job.requestedLanguage || null,
       totalKeywords: keywordData.length,
       totalClusters: clusters.length,
       totalSearchVolume: clusters.reduce((sum, c) => sum + c.totalSearchVolume, 0),
