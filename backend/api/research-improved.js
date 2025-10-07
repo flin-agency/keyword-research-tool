@@ -79,10 +79,7 @@ function validateInput(req, res, next) {
  */
 router.post('/', rateLimiter, validateInput, async (req, res) => {
   try {
-    // FORCE Switzerland and German - ignore user selection
-    const country = '2756'; // Switzerland
-    const language = 'de'; // German
-    const { options = {} } = req.body;
+    const { country, language, options = {} } = req.body;
     const url = req.validatedUrl;
 
     const jobId = uuidv4();
@@ -236,10 +233,10 @@ router.get('/config/countries', (req, res) => {
 
 /**
  * GET /api/research/config/languages
- * Get available languages - always returns German
+ * Get available languages
  */
 router.get('/config/languages', (req, res) => {
-  res.json(['de']);
+  res.json(['de', 'en', 'fr', 'it']);
 });
 
 /**
@@ -331,6 +328,7 @@ async function processResearch(jobId, url, country = '2756', language = null, op
       algorithm: options.clusterAlgorithm || 'hybrid',
       useAI: options.useAI !== false,
       minClusterSize: options.minClusterSize || 3,
+      language: language,
     });
 
     console.log(`[${jobId}] Created ${clusters.length} topic clusters`);
@@ -338,15 +336,24 @@ async function processResearch(jobId, url, country = '2756', language = null, op
     updateJob(job, {
       progress: 90,
       step: 'finalizing results',
-    });
-
-    // Step 5: Prepare final results
+    });    // Step 5: Prepare final results
     const processingTime = Date.now() - startTime;
+
+    // Log AI content before preparing final data
+    console.log(`[${jobId}] Checking AI content in clusters before final data preparation:`);
+    clusters.slice(0, 3).forEach((c, i) => {
+      console.log(`[${jobId}] Cluster ${i + 1} "${c.pillarTopic}":`, {
+        hasAiDescription: !!c.aiDescription,
+        hasAiContentStrategy: !!c.aiContentStrategy,
+        aiDescriptionLength: c.aiDescription?.length || 0,
+        aiContentStrategyLength: c.aiContentStrategy?.length || 0
+      });
+    });
 
     const finalData = {
       url,
-      country: 'Switzerland',
-      language: language || 'de',
+      country: country,
+      language: language || 'en',
       totalKeywords: keywordData.length,
       totalClusters: clusters.length,
       totalSearchVolume: clusters.reduce((sum, c) => sum + c.totalSearchVolume, 0),
@@ -365,8 +372,16 @@ async function processResearch(jobId, url, country = '2756', language = null, op
       scrapedContent: {
         pages: content.pages.slice(0, 10), // Limit stored pages
         totalWords: content.totalWords,
-      },
-    };
+      },    };
+
+    // Log AI content in final data
+    console.log(`[${jobId}] Checking AI content in finalData.clusters:`);
+    finalData.clusters.slice(0, 3).forEach((c, i) => {
+      console.log(`[${jobId}] Final cluster ${i + 1} "${c.pillarTopic}":`, {
+        hasAiDescription: !!c.aiDescription,
+        hasAiContentStrategy: !!c.aiContentStrategy
+      });
+    });
 
     // Complete job
     updateJob(job, {

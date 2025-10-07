@@ -370,9 +370,9 @@ function displayResults(data) {
           <span>🎯 Competition: ${cluster.avgCompetition || 'N/A'}</span>
           <span>💯 Score: ${cluster.clusterValueScore || 0}</span>
         </div>
-        ${cluster.aiDescription ? `<p style="margin: 10px 0; color: #666;">${cluster.aiDescription}</p>` : ''}
-        ${cluster.aiContentStrategy ? `<p style="margin: 10px 0; color: #667eea; font-style: italic;">Strategy: ${cluster.aiContentStrategy}</p>` : ''}
-        <div id="cluster-${index}" style="display: none;">
+        ${cluster.aiDescription ? `<div class="cluster-description">${cluster.aiDescription}</div>` : ''}
+        ${cluster.aiContentStrategy ? `<div class="cluster-strategy">✨ <strong>Content Strategy:</strong> ${cluster.aiContentStrategy}</div>` : ''}
+        <div id="cluster-${index}" class="cluster-details" style="display: none;">
           <table class="keywords-table">
             <thead>
               <tr>

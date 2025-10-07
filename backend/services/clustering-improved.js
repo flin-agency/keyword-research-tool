@@ -76,18 +76,31 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
     // Enhance with AI if available
     if (useAI && process.env.GEMINI_API_KEY) {
       try {
-        console.log('[Clustering] Enhancing with Gemini AI...');
+        console.log(`[Clustering] Enhancing with Gemini AI in ${options.language || 'en'}...`);
 
         // First, analyze and regroup
-        clusters = await gemini.analyzeAndRegroupClusters(clusters, websiteContext, keywordData);
+        clusters = await gemini.analyzeAndRegroupClusters(clusters, websiteContext, keywordData, options.language);
 
-        // Then enhance top clusters with detailed analysis
-        const topClustersToEnhance = Math.min(5, clusters.length);
-        for (let i = 0; i < topClustersToEnhance; i++) {
-          clusters[i] = await gemini.enhanceClusterWithAI(clusters[i], websiteContext);
-        }
-
-        console.log('[Clustering] AI enhancement complete');
+        // Then enhance ALL clusters with detailed analysis
+        console.log(`[Clustering] Enhancing all ${clusters.length} clusters with AI descriptions and content strategy...`);
+        for (let i = 0; i < clusters.length; i++) {
+          try {
+            clusters[i] = await gemini.enhanceClusterWithAI(clusters[i], websiteContext, options.language);
+            console.log(`[Clustering] Enhanced cluster ${i + 1}/${clusters.length}: "${clusters[i].pillarTopic}"`);
+          } catch (error) {
+            console.warn(`[Clustering] Failed to enhance cluster ${i + 1} ("${clusters[i].pillarTopic}"):`, error.message);
+          }
+        }        console.log('[Clustering] AI enhancement complete');
+        
+        // Verify AI content is present
+        const enhancedCount = clusters.filter(c => c.aiDescription || c.aiContentStrategy).length;
+        console.log(`[Clustering] ${enhancedCount}/${clusters.length} clusters have AI-generated content`);
+        clusters.slice(0, 3).forEach((c, i) => {
+          console.log(`[Clustering] Cluster ${i + 1} "${c.pillarTopic}":`, {
+            hasAiDescription: !!c.aiDescription,
+            hasAiContentStrategy: !!c.aiContentStrategy
+          });
+        });
       } catch (error) {
         console.warn('[Clustering] AI enhancement failed:', error.message);
       }
