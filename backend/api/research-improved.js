@@ -5,6 +5,7 @@ const keywordExtractor = require('../services/keyword-extractor');
 const googleAdsImproved = require('../services/google-ads-python');
 const clusteringImproved = require('../services/clustering-improved');
 const exporter = require('../services/exporter');
+const { resolveLanguage } = require('../utils/language');
 
 const router = express.Router();
 
@@ -81,13 +82,15 @@ router.post('/', rateLimiter, validateInput, async (req, res) => {
   try {
     const { country, language, options = {} } = req.body;
     const url = req.validatedUrl;
+    const resolvedLanguage = resolveLanguage(language, country);
 
     const jobId = uuidv4();
     const job = {
       id: jobId,
       url,
       country,
-      language,
+      language: resolvedLanguage,
+      requestedLanguage: language || null,
       options,
       status: 'processing',
       progress: 0,
@@ -102,7 +105,7 @@ router.post('/', rateLimiter, validateInput, async (req, res) => {
     jobs.set(jobId, job);
 
     // Start processing asynchronously
-    processResearch(jobId, url, country, language, options);
+    processResearch(jobId, url, country, resolvedLanguage, options);
 
     // Clean old jobs (older than 24 hours)
     cleanOldJobs();
@@ -247,6 +250,8 @@ async function processResearch(jobId, url, country = '2756', language = null, op
   if (!job) return;
 
   const startTime = Date.now();
+  const resolvedLanguage = resolveLanguage(language, country);
+  updateJob(job, { language: resolvedLanguage });
 
   try {
     // Step 1: Scrape website (30% of progress)
@@ -284,7 +289,7 @@ async function processResearch(jobId, url, country = '2756', language = null, op
     // Step 2: Extract keywords (40% of progress)
     console.log(`[${jobId}] Extracting keywords with AI`);
 
-    const seedKeywords = await keywordExtractor.extractKeywords(content, language);
+    const seedKeywords = await keywordExtractor.extractKeywords(content, resolvedLanguage);
 
     if (!seedKeywords || seedKeywords.length === 0) {
       throw new Error('No keywords could be extracted from the website content');
@@ -301,7 +306,7 @@ async function processResearch(jobId, url, country = '2756', language = null, op
     // Step 3: Get keyword metrics (60% of progress)
     console.log(`[${jobId}] Fetching metrics from Google Ads API`);
 
-    const keywordData = await googleAdsImproved.getKeywordMetrics(seedKeywords, country, language);
+    const keywordData = await googleAdsImproved.getKeywordMetrics(seedKeywords, country, resolvedLanguage);
 
     if (!keywordData || keywordData.length === 0) {
       throw new Error('Google Ads API returned no keyword data. Please check your API configuration and credentials.');
@@ -328,7 +333,7 @@ async function processResearch(jobId, url, country = '2756', language = null, op
       algorithm: options.clusterAlgorithm || 'hybrid',
       useAI: options.useAI !== false,
       minClusterSize: options.minClusterSize || 3,
-      language: language,
+      language: resolvedLanguage,
     });
 
     console.log(`[${jobId}] Created ${clusters.length} topic clusters`);
@@ -353,7 +358,7 @@ async function processResearch(jobId, url, country = '2756', language = null, op
     const finalData = {
       url,
       country: country,
-      language: language || 'en',
+      language: resolvedLanguage,
       totalKeywords: keywordData.length,
       totalClusters: clusters.length,
       totalSearchVolume: clusters.reduce((sum, c) => sum + c.totalSearchVolume, 0),
