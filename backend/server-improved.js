@@ -17,6 +17,8 @@ const authRouter = require('./api/auth-google');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+let server;
+
 // Configuration
 const config = {
   maxRequestSize: process.env.MAX_REQUEST_SIZE || '10mb',
@@ -149,26 +151,41 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json(errorResponse);
 });
 
+// Track shutdown state to avoid duplicate work
+let isShuttingDown = false;
+
 // Graceful shutdown handler
-function gracefulShutdown() {
+function gracefulShutdown(signal) {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
   console.log('[Server] Shutting down gracefully...');
 
-  // Close server
-  server.close(() => {
+  const finalize = () => {
     console.log('[Server] HTTP server closed');
-    process.exit(0);
-  });
+    process.exitCode = 0;
 
-  // Force close after 10 seconds
-  setTimeout(() => {
-    console.error('[Server] Forcing shutdown');
-    process.exit(1);
-  }, 10000);
+    // On Windows terminals the parent cmd.exe process can prompt the user to
+    // terminate the "batch job" after Ctrl+C. Pausing stdin allows Node.js to
+    // finish without keeping the prompt open for further interaction.
+    if (process.platform === 'win32' && process.stdin && typeof process.stdin.pause === 'function') {
+      process.stdin.pause();
+    }
+  };
+
+  if (server && server.listening) {
+    server.close(finalize);
+  } else {
+    finalize();
+  }
 }
 
 // Handle shutdown signals
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
+['SIGTERM', 'SIGINT'].forEach((signal) => {
+  process.on(signal, () => gracefulShutdown(signal));
+});
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
@@ -182,7 +199,6 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Start server
-let server;
 if (require.main === module) {
   server = app.listen(PORT, () => {
     console.log('[Server] Starting Keyword Research Tool');
