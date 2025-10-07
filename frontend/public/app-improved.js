@@ -1,271 +1,49 @@
-// API Configuration Management
-const API_SETTINGS_KEY = 'keywordResearchAPISettings';
+const state = {
+  currentJobId: null,
+  pollInterval: null,
+};
 
-// Load API settings from localStorage
-function loadAPISettings() {
-  const saved = localStorage.getItem(API_SETTINGS_KEY);
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to parse saved settings:', e);
-    }
-  }
-  return {};
+const elements = {
+  urlInput: document.getElementById('urlInput'),
+  countrySelect: document.getElementById('countrySelect'),
+  languageSelect: document.getElementById('languageSelect'),
+  startBtn: document.getElementById('startBtn'),
+  progressContainer: document.getElementById('progressContainer'),
+  progressFill: document.getElementById('progressFill'),
+  progressText: document.getElementById('progressText'),
+  messageContainer: document.getElementById('messageContainer'),
+  results: document.getElementById('results'),
+  summary: document.getElementById('summary'),
+  clusters: document.getElementById('clusters'),
+  exportCsv: document.getElementById('exportCsv'),
+  exportJson: document.getElementById('exportJson'),
+};
+
+function getSelectedLanguageLabel() {
+  const { languageSelect } = elements;
+  if (!languageSelect) return '';
+  const option = languageSelect.options[languageSelect.selectedIndex];
+  return option?.dataset?.label || option?.textContent || '';
 }
-
-// Save API settings to localStorage
-function saveAPISettings(settings) {
-  localStorage.setItem(API_SETTINGS_KEY, JSON.stringify(settings));
-}
-
-// Check API configuration status
-async function checkAPIStatus() {
-  try {
-    const response = await fetch('/health');
-    const data = await response.json();
-    return data.services || {};
-  } catch (error) {
-    console.error('Failed to check API status:', error);
-    return {};
-  }
-}
-
-// Update API status badges
-async function updateAPIStatusBadges() {
-  const status = await checkAPIStatus();
-
-  const googleAdsStatus = document.getElementById('googleAdsStatus');
-  const geminiStatus = document.getElementById('geminiStatus');
-  const apiWarning = document.getElementById('apiWarning');
-
-  if (status.googleAds) {
-    googleAdsStatus.textContent = 'Configured';
-    googleAdsStatus.className = 'api-status configured';
-  } else {
-    googleAdsStatus.textContent = 'Not Configured';
-    googleAdsStatus.className = 'api-status not-configured';
-  }
-
-  if (status.geminiAI) {
-    geminiStatus.textContent = 'Configured';
-    geminiStatus.className = 'api-status configured';
-  } else {
-    geminiStatus.textContent = 'Not Configured';
-    geminiStatus.className = 'api-status not-configured';
-  }
-
-  // Show/hide warning banner
-  if (!status.googleAds) {
-    apiWarning.classList.add('visible');
-  } else {
-    apiWarning.classList.remove('visible');
-  }
-}
-
-// Initialize settings modal
-function initSettingsModal() {
-  const modal = document.getElementById('settingsModal');
-  const settingsBtn = document.getElementById('settingsBtn');
-  const closeModal = document.getElementById('closeModal');
-  const cancelSettings = document.getElementById('cancelSettings');
-  const saveSettings = document.getElementById('saveSettings');
-  const testConnection = document.getElementById('testConnection');
-
-  // Load saved settings into form
-  const settings = loadAPISettings();
-  if (settings.googleAds) {
-    document.getElementById('developerToken').value = settings.googleAds.developerToken || '';
-    document.getElementById('clientId').value = settings.googleAds.clientId || '';
-    document.getElementById('clientSecret').value = settings.googleAds.clientSecret || '';
-    document.getElementById('refreshToken').value = settings.googleAds.refreshToken || '';
-    document.getElementById('loginCustomerId').value = settings.googleAds.loginCustomerId || '';
-  }
-  if (settings.gemini) {
-    document.getElementById('geminiApiKey').value = settings.gemini.apiKey || '';
-  }
-
-  // Open modal
-  settingsBtn.addEventListener('click', () => {
-    modal.classList.add('active');
-    updateAPIStatusBadges();
-  });
-
-  // Close modal
-  closeModal.addEventListener('click', () => {
-    modal.classList.remove('active');
-  });
-
-  cancelSettings.addEventListener('click', () => {
-    modal.classList.remove('active');
-  });
-
-  // Save settings
-  saveSettings.addEventListener('click', async () => {
-    const newSettings = {
-      googleAds: {
-        developerToken: document.getElementById('developerToken').value.trim(),
-        clientId: document.getElementById('clientId').value.trim(),
-        clientSecret: document.getElementById('clientSecret').value.trim(),
-        refreshToken: document.getElementById('refreshToken').value.trim(),
-        loginCustomerId: document.getElementById('loginCustomerId').value.trim().replace(/-/g, ''),
-      },
-      gemini: {
-        apiKey: document.getElementById('geminiApiKey').value.trim(),
-      }
-    };
-
-    // Save to localStorage
-    saveAPISettings(newSettings);
-
-    // Update environment variables on server
-    try {
-      const response = await fetch('/api/settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newSettings),
-      });
-
-      if (response.ok) {
-        showMessage('Settings saved successfully! Server will restart to apply changes.', 'success');
-        setTimeout(() => {
-          modal.classList.remove('active');
-          updateAPIStatusBadges();
-        }, 2000);
-      } else {
-        showMessage('Failed to save settings. Please try again.', 'error');
-      }
-    } catch (error) {
-      console.error('Failed to save settings:', error);
-      showMessage('Settings saved locally. Server update failed.', 'warning');
-      modal.classList.remove('active');
-    }
-  });
-
-  // Test connection
-  testConnection.addEventListener('click', async () => {
-    showMessage('Testing API connections...', 'info');
-
-    try {
-      const response = await fetch('/api/settings/test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          googleAds: {
-            developerToken: document.getElementById('developerToken').value.trim(),
-            clientId: document.getElementById('clientId').value.trim(),
-            clientSecret: document.getElementById('clientSecret').value.trim(),
-            refreshToken: document.getElementById('refreshToken').value.trim(),
-            loginCustomerId: document.getElementById('loginCustomerId').value.trim().replace(/-/g, ''),
-          },
-          gemini: {
-            apiKey: document.getElementById('geminiApiKey').value.trim(),
-          }
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.googleAds && result.gemini) {
-        showMessage('✅ All APIs connected successfully!', 'success');
-      } else {
-        let message = 'Connection test results:\n';
-        message += result.googleAds ? '✅ Google Ads API connected\n' : '❌ Google Ads API failed\n';
-        message += result.gemini ? '✅ Gemini AI connected' : '❌ Gemini AI failed';
-        showMessage(message, result.googleAds || result.gemini ? 'warning' : 'error');
-      }
-    } catch (error) {
-      showMessage('Failed to test connection. Check your settings.', 'error');
-    }
-  });
-
-  // Close modal on outside click
-  window.addEventListener('click', (event) => {
-    if (event.target === modal) {
-      modal.classList.remove('active');
-    }
-  });
-}
-
-// Show message in modal or main container
-function showMessage(message, type = 'info') {
-  // Check if we're in modal context
-  const modal = document.querySelector('.modal.active');
-  let container;
-
-  if (modal) {
-    // Create or find message container in modal
-    container = modal.querySelector('.modal-message');
-    if (!container) {
-      container = document.createElement('div');
-      container.className = 'modal-message';
-      modal.querySelector('.modal-footer').insertAdjacentElement('beforebegin', container);
-    }
-  } else {
-    container = document.getElementById('messageContainer');
-  }
-
-  if (!container) return;
-
-  const messageDiv = document.createElement('div');
-  messageDiv.className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'warning-banner visible';
-  messageDiv.textContent = message;
-  messageDiv.style.marginTop = '10px';
-
-  container.innerHTML = '';
-  container.appendChild(messageDiv);
-
-  // Auto-hide after 5 seconds
-  setTimeout(() => {
-    messageDiv.remove();
-  }, 5000);
-}
-
-// Main app functionality (from original app.js)
-let currentJobId = null;
-let pollInterval = null;
-
-const urlInput = document.getElementById('urlInput');
-const countrySelect = document.getElementById('countrySelect');
-const languageSelect = document.getElementById('languageSelect');
-const startBtn = document.getElementById('startBtn');
-const progressContainer = document.getElementById('progressContainer');
-const progressFill = document.getElementById('progressFill');
-const progressText = document.getElementById('progressText');
-const messageContainer = document.getElementById('messageContainer');
-const results = document.getElementById('results');
-const summary = document.getElementById('summary');
-const clusters = document.getElementById('clusters');
-const exportCsv = document.getElementById('exportCsv');
-const exportJson = document.getElementById('exportJson');
-
-startBtn.addEventListener('click', startResearch);
-exportCsv.addEventListener('click', () => exportResults('csv'));
-exportJson.addEventListener('click', () => exportResults('json'));
 
 async function startResearch() {
-  const url = urlInput.value.trim();
-  const country = countrySelect.value;
-  const language = languageSelect.value;
-  const languageLabel = languageSelect.options[languageSelect.selectedIndex]?.dataset?.label || '';
+  const url = elements.urlInput.value.trim();
+  const country = elements.countrySelect.value;
+  const language = elements.languageSelect.value;
+  const languageLabel = getSelectedLanguageLabel();
 
   if (!url) {
     showError('Please enter a website URL');
     return;
   }
 
-  // Reset UI
-  messageContainer.innerHTML = '';
-  results.style.display = 'none';
-  progressContainer.style.display = 'block';
-  startBtn.disabled = true;
+  resetMessages();
+  elements.results.style.display = 'none';
+  elements.progressContainer.style.display = 'block';
+  elements.startBtn.disabled = true;
+  updateProgress(5, 'Starting research...');
 
   try {
-    // Start research job
     const response = await fetch('/api/research', {
       method: 'POST',
       headers: {
@@ -275,15 +53,18 @@ async function startResearch() {
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json().catch(() => ({}));
       throw new Error(error.error || 'Failed to start research');
     }
 
-    const { job_id } = await response.json();
-    currentJobId = job_id;
+    const { job_id: jobId } = await response.json();
+    state.currentJobId = jobId;
 
-    // Start polling for results
-    pollInterval = setInterval(() => pollJobStatus(job_id), 2000);
+    if (state.pollInterval) {
+      clearInterval(state.pollInterval);
+    }
+
+    state.pollInterval = setInterval(() => pollJobStatus(jobId), 2000);
   } catch (error) {
     showError(error.message);
     resetUI();
@@ -298,45 +79,36 @@ async function pollJobStatus(jobId) {
     }
 
     const job = await response.json();
-
-    // Update progress
     updateProgress(job.progress || 0, job.step || 'Processing...');
 
-    // Check if job is complete
     if (job.status === 'completed') {
-      clearInterval(pollInterval);
+      clearInterval(state.pollInterval);
       displayResults(job.data);
       resetUI();
 
-      // Show warnings if any
-      if (job.warnings && job.warnings.length > 0) {
-        job.warnings.forEach(warning => {
-          showWarning(warning);
-        });
-      }
+      (job.warnings || []).forEach((warning) => showWarning(warning));
     } else if (job.status === 'failed') {
-      clearInterval(pollInterval);
+      clearInterval(state.pollInterval);
       showError(job.error || 'Research failed');
       resetUI();
     }
   } catch (error) {
-    clearInterval(pollInterval);
+    clearInterval(state.pollInterval);
     showError(error.message);
     resetUI();
   }
 }
 
 function updateProgress(progress, step) {
-  progressFill.style.width = `${progress}%`;
-  progressFill.textContent = `${progress}%`;
-  progressText.textContent = step;
+  elements.progressFill.style.width = `${progress}%`;
+  elements.progressFill.textContent = `${progress}%`;
+  elements.progressText.textContent = step;
 }
 
 function displayResults(data) {
   if (!data) return;
 
-  // Display summary
-  summary.innerHTML = `
+  elements.summary.innerHTML = `
     <div class="stat-card">
       <div class="number">${data.totalKeywords?.toLocaleString() || 0}</div>
       <div class="label">Total Keywords</div>
@@ -355,116 +127,128 @@ function displayResults(data) {
     </div>
   `;
 
-  // Display clusters
-  clusters.innerHTML = '';
-  if (data.clusters && data.clusters.length > 0) {
-    data.clusters.forEach((cluster, index) => {
-      const clusterDiv = document.createElement('div');
-      clusterDiv.className = 'cluster';
-      clusterDiv.innerHTML = `
-        <div class="cluster-header" onclick="toggleCluster(${index})">
-          <div class="cluster-title">${cluster.pillarTopic}</div>
-          <div class="cluster-badge">${cluster.keywords?.length || 0} keywords</div>
-        </div>
-        <div class="cluster-meta">
-          <span>📊 Volume: ${cluster.totalSearchVolume?.toLocaleString() || 0}</span>
-          <span>🎯 Competition: ${cluster.avgCompetition || 'N/A'}</span>
-          <span>💯 Score: ${cluster.clusterValueScore || 0}</span>
-        </div>
-        ${cluster.aiDescription ? `<div class="cluster-description">${cluster.aiDescription}</div>` : ''}
-        ${cluster.aiContentStrategy ? `<div class="cluster-strategy">✨ <strong>Content Strategy:</strong> ${cluster.aiContentStrategy}</div>` : ''}
-        <div id="cluster-${index}" class="cluster-details" style="display: none;">
-          <table class="keywords-table">
-            <thead>
+  elements.clusters.innerHTML = '';
+  (data.clusters || []).forEach((cluster, index) => {
+    const clusterDiv = document.createElement('div');
+    clusterDiv.className = 'cluster';
+    clusterDiv.innerHTML = `
+      <div class="cluster-header" onclick="toggleCluster(${index})">
+        <div class="cluster-title">${cluster.pillarTopic}</div>
+        <div class="cluster-badge">${cluster.keywords?.length || 0} keywords</div>
+      </div>
+      <div class="cluster-meta">
+        <span>📊 Volume: ${cluster.totalSearchVolume?.toLocaleString() || 0}</span>
+        <span>🎯 Competition: ${cluster.avgCompetition || 'N/A'}</span>
+        <span>💯 Score: ${cluster.clusterValueScore || 0}</span>
+      </div>
+      ${cluster.aiDescription ? `<div class="cluster-description">${cluster.aiDescription}</div>` : ''}
+      ${cluster.aiContentStrategy ? `<div class="cluster-strategy">✨ <strong>Content Strategy:</strong> ${cluster.aiContentStrategy}</div>` : ''}
+      <div id="cluster-${index}" class="cluster-details" style="display: none;">
+        <table class="keywords-table">
+          <thead>
+            <tr>
+              <th>Keyword</th>
+              <th>Search Volume</th>
+              <th>Competition</th>
+              <th>CPC</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(cluster.keywords || [])
+              .slice(0, 10)
+              .map(
+                (kw) => `
               <tr>
-                <th>Keyword</th>
-                <th>Search Volume</th>
-                <th>Competition</th>
-                <th>CPC</th>
+                <td>${kw.keyword}</td>
+                <td>${kw.searchVolume?.toLocaleString() || 0}</td>
+                <td><span class="competition-badge competition-${kw.competition}">${kw.competition}</span></td>
+                <td>$${kw.cpc?.toFixed(2) || '0.00'}</td>
               </tr>
-            </thead>
-            <tbody>
-              ${(cluster.keywords || [])
-                .slice(0, 10)
-                .map(
-                  (kw) => `
-                <tr>
-                  <td>${kw.keyword}</td>
-                  <td>${kw.searchVolume?.toLocaleString() || 0}</td>
-                  <td><span class="competition-badge competition-${kw.competition}">${kw.competition}</span></td>
-                  <td>$${kw.cpc?.toFixed(2) || '0.00'}</td>
-                </tr>
-              `
-                )
-                .join('')}
-            </tbody>
-          </table>
-          ${cluster.keywords?.length > 10 ? `<p style="margin-top: 10px; color: #666;">... and ${cluster.keywords.length - 10} more keywords</p>` : ''}
-        </div>
-      `;
-      clusters.appendChild(clusterDiv);
-    });
-  }
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+        ${cluster.keywords?.length > 10 ? `<p style="margin-top: 10px; color: #666;">... and ${cluster.keywords.length - 10} more keywords</p>` : ''}
+      </div>
+    `;
 
-  results.style.display = 'block';
+    elements.clusters.appendChild(clusterDiv);
+  });
+
+  elements.results.style.display = 'block';
 }
 
 function toggleCluster(index) {
-  const clusterContent = document.getElementById(`cluster-${index}`);
-  if (clusterContent) {
-    clusterContent.style.display = clusterContent.style.display === 'none' ? 'block' : 'none';
+  const content = document.getElementById(`cluster-${index}`);
+  if (content) {
+    content.style.display = content.style.display === 'none' ? 'block' : 'none';
   }
 }
 
 async function exportResults(format) {
-  if (!currentJobId) return;
+  if (!state.currentJobId) return;
 
   try {
-    const response = await fetch(`/api/research/${currentJobId}/export?format=${format}`);
+    const response = await fetch(`/api/research/${state.currentJobId}/export?format=${format}`);
     if (!response.ok) {
       throw new Error('Failed to export results');
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `keywords-${currentJobId.slice(0, 8)}.${format}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `keywords-${state.currentJobId.slice(0, 8)}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
   } catch (error) {
     showError(error.message);
   }
 }
 
 function showError(message) {
-  messageContainer.innerHTML = `<div class="error">${message}</div>`;
+  if (!elements.messageContainer) return;
+  elements.messageContainer.innerHTML = `<div class="error">${message}</div>`;
 }
 
 function showWarning(message) {
+  if (!elements.messageContainer) return;
   const warning = document.createElement('div');
   warning.className = 'warning-banner visible';
   warning.textContent = `⚠️ ${message}`;
   warning.style.marginTop = '10px';
-  messageContainer.appendChild(warning);
+  elements.messageContainer.appendChild(warning);
+}
+
+function resetMessages() {
+  if (elements.messageContainer) {
+    elements.messageContainer.innerHTML = '';
+  }
 }
 
 function resetUI() {
-  startBtn.disabled = false;
-  progressContainer.style.display = 'none';
+  elements.startBtn.disabled = false;
+  elements.progressContainer.style.display = 'none';
   updateProgress(0, 'Ready');
 }
 
-// Initialize app
 document.addEventListener('DOMContentLoaded', () => {
-  initSettingsModal();
-  updateAPIStatusBadges();
+  if (elements.startBtn) {
+    elements.startBtn.addEventListener('click', startResearch);
+  }
 
-  // Check API status periodically
-  setInterval(updateAPIStatusBadges, 30000);
+  if (elements.exportCsv) {
+    elements.exportCsv.addEventListener('click', () => exportResults('csv'));
+  }
+
+  if (elements.exportJson) {
+    elements.exportJson.addEventListener('click', () => exportResults('json'));
+  }
+
+  updateProgress(0, 'Ready');
 });
 
-// Make toggle function global
 window.toggleCluster = toggleCluster;

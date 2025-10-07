@@ -1,7 +1,7 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const scraperUnified = require('../services/scraper-unified');
-const keywordExtractor = require('../services/keyword-extractor');
+const { extractKeywordsWithAI } = require('../services/gemini');
 const googleAdsImproved = require('../services/google-ads-python');
 const clusteringImproved = require('../services/clustering-improved');
 const exporter = require('../services/exporter');
@@ -72,6 +72,51 @@ function validateInput(req, res, next) {
 
   // Skip validation - we force Switzerland/German anyway
   next();
+}
+
+function sanitizeKeywordCandidate(value) {
+  if (!value) return null;
+
+  const trimmed = value.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!trimmed) return null;
+
+  const wordCount = trimmed.split(' ').length;
+
+  // Avoid sentences that are too long or look like boilerplate copy
+  if (wordCount > 6 || trimmed.length > 80) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function buildFallbackKeywords(scrapedContent) {
+  const fallback = new Set();
+
+  scrapedContent.pages.forEach((page) => {
+    const titleCandidate = sanitizeKeywordCandidate(page.title);
+    if (titleCandidate) fallback.add(titleCandidate);
+
+    const metaCandidate = sanitizeKeywordCandidate(page.metaDescription);
+    if (metaCandidate) fallback.add(metaCandidate);
+
+    [...(page.headings?.h1 || []), ...(page.headings?.h2 || []), ...(page.headings?.h3 || [])]
+      .map(sanitizeKeywordCandidate)
+      .filter(Boolean)
+      .forEach((candidate) => fallback.add(candidate));
+  });
+
+  return Array.from(fallback).slice(0, 100);
+}
+
+async function generateSeedKeywords(scrapedContent, languageCode) {
+  const aiKeywords = await extractKeywordsWithAI(scrapedContent, 150, languageCode);
+  if (Array.isArray(aiKeywords) && aiKeywords.length > 0) {
+    return aiKeywords;
+  }
+
+  console.warn('[Keywords] Gemini extraction unavailable, falling back to headings-based keywords');
+  return buildFallbackKeywords(scrapedContent);
 }
 
 /**
@@ -293,10 +338,10 @@ async function processResearch(jobId, url, country = '2756', language = null, op
     // Step 2: Extract keywords (40% of progress)
     console.log(`[${jobId}] Extracting keywords with AI`);
 
-    const seedKeywords = await keywordExtractor.extractKeywords(content, resolvedLanguage);
+    const seedKeywords = await generateSeedKeywords(content, resolvedLanguage);
 
     if (!seedKeywords || seedKeywords.length === 0) {
-      throw new Error('No keywords could be extracted from the website content');
+      throw new Error('No keywords could be extracted from the provided content');
     }
 
     console.log(`[${jobId}] Extracted ${seedKeywords.length} seed keywords`);
@@ -346,7 +391,9 @@ async function processResearch(jobId, url, country = '2756', language = null, op
     updateJob(job, {
       progress: 90,
       step: 'finalizing results',
-    });    // Step 5: Prepare final results
+    });
+
+    // Step 5: Prepare final results
     const processingTime = Date.now() - startTime;
 
     // Log AI content before preparing final data

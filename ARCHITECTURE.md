@@ -172,75 +172,81 @@
 
 ---
 
-### 2. Keyword Extractor Module (`keyword-extractor.js`)
+### 2. Gemini Keyword Intelligence (`gemini.js`)
 
-**Purpose**: Extract relevant keywords using NLP
+**Purpose**: Generate multilingual, marketing-grade seed keywords and enhance topic clusters.
 
-**Input**: Scraped content object
+**Input**: Scraped content object and language metadata
 
-**Output**: Array of keyword strings
+**Output**:
+- Array of keyword strings (max 150)
+- Optional cluster enrichment (pillar topic, description, strategy)
 
 **Key Functions**:
-- `extractKeywords(content)` - Main extraction function
-- `extractSingleKeywords(texts)` - Extract nouns/verbs/adjectives
-- `extractPhrases(texts)` - Extract 2-4 word phrases
-- `calculateRelevanceScore(keyword)` - TF-IDF based scoring
+- `extractKeywordsWithAI(scrapedContent, maxKeywords, language)` - Prompt Gemini for localized keyword ideas.
+- `enhanceClusterWithAI(cluster, websiteContext, language)` - Rename and describe clusters in the requested language.
+- `analyzeAndRegroupClusters(clusters, websiteContext, keywords, language)` - Suggest cluster regrouping.
 
-**Technologies**: Natural, Compromise, Stopword
+**Technologies**: Google Gemini API, custom language utilities
 
 ---
 
-### 3. Google Ads Module (`google-ads.js`)
+### 3. Google Ads Bridge (`google-ads-python.js`)
 
-**Purpose**: Get keyword metrics from Google Ads API
+**Purpose**: Retrieve real search metrics for AI-generated keywords.
 
-**Input**: Array of seed keywords
+**Input**: Array of keyword strings, target country, language code
 
 **Output**:
 ```javascript
-[{
-  keyword: string,
-  searchVolume: number,
-  competition: "low" | "medium" | "high",
-  cpc: number,
-  cpcHigh: number
-}]
+[
+  {
+    keyword: string,
+    searchVolume: number,
+    competition: "low" | "medium" | "high",
+    cpc: number,
+    cpcHigh: number
+  }
+]
 ```
 
 **Key Functions**:
-- `getKeywordMetrics(seeds)` - Query real API
-- `getMockKeywordData(seeds)` - Generate mock data
-- `initializeClient()` - Set up API client
+- `getKeywordMetrics(keywords, country, language)` - Proxy request to the Python Google Ads service.
+- `normalizeKeywordResponse(data)` - Standardize Ads metrics for clustering.
 
-**Technologies**: google-ads-api
+**Technologies**: Axios HTTP client, Python Ads microservice (Google Ads official SDK)
 
 ---
 
-### 4. Clustering Module (`clustering.js`)
+### 4. Clustering Engine (`clustering-improved.js`)
 
-**Purpose**: Group keywords into topic clusters
+**Purpose**: Group enriched keywords into meaningful topic clusters with AI insights.
 
-**Input**: Array of keyword objects with metrics
+**Input**: Keyword metric objects, website context, language metadata
 
 **Output**:
 ```javascript
-[{
-  id: number,
-  pillarTopic: string,
-  keywords: [],
-  totalSearchVolume: number,
-  avgCompetition: string,
-  clusterValueScore: number
-}]
+[
+  {
+    id: string,
+    pillarTopic: string,
+    keywords: KeywordMetric[],
+    totalSearchVolume: number,
+    avgCompetition: string,
+    clusterValueScore: number,
+    aiDescription?: string,
+    aiContentStrategy?: string,
+    aiEnhanced?: boolean
+  }
+]
 ```
 
 **Key Functions**:
-- `clusterKeywords(data)` - Main clustering function
-- `vectorizeKeywords(data)` - Convert to TF-IDF vectors
-- `calculateClusterValue(keywords)` - Score clusters
-- `calculateSimilarity(kw1, kw2)` - Semantic similarity
+- `clusterKeywords(data, websiteContext, options)` - Hybrid pipeline (K-Means, DBSCAN, semantic grouping).
+- `enrichClusterWithGemini(cluster, context, language)` - Localize descriptions and strategies.
+- `scoreCluster(cluster)` - Compute opportunity and priority metrics.
 
-**Technologies**: ml-kmeans, Natural (TF-IDF)
+**Technologies**: density-clustering, ml-kmeans, cosine similarity, Google Gemini
 
 ---
 
@@ -388,24 +394,15 @@ Continue processing
 
 ## Testing Architecture
 
-### Test Suites (6)
-1. `api.test.js` - API endpoints
-2. `scraper.test.js` - HTML parsing
-3. `keyword-extractor.test.js` - NLP extraction
-4. `google-ads.test.js` - API mocking
-5. `clustering.test.js` - ML algorithms
-6. `exporter.test.js` - Data export
+### Current Status
+- Legacy Jest suites covering the deprecated pipeline have been removed.
+- Remaining automated tests: `scraper.test.js`, `exporter.test.js`.
+- New integration tests should target `research-improved`, `clustering-improved`, and Gemini-assisted flows.
 
-### Test Types
-- **Unit Tests**: Individual functions
-- **Integration Tests**: Module interactions
-- **API Tests**: HTTP endpoints
-- **Mock Tests**: External dependencies
-
-### Coverage
-- **Total**: 67.21%
-- **Critical Modules**: 97-100%
-- **API Wrappers**: 40-50% (adequate)
+### Recommended Test Types
+- **Unit Tests**: Language utilities, Gemini prompt builders, clustering helpers.
+- **Integration Tests**: Full research job workflow with mocked Google Ads service.
+- **API Contract Tests**: `/api/research` happy-path and error scenarios.
 
 ---
 
