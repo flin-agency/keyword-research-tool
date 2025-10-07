@@ -104,14 +104,30 @@ Maximum ${maxKeywords} keywords. Focus on QUALITY over quantity.`;
 /**
  * Use Gemini to improve cluster naming and grouping
  */
-async function enhanceClusterWithAI(cluster, websiteContext) {
+async function enhanceClusterWithAI(cluster, websiteContext, languageCode = 'en') {
   try {
     const ai = initializeGemini();
     if (!ai) return cluster; // Return unchanged if no API key
 
     const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-    const prompt = `You are an SEO and content marketing expert analyzing keyword clusters.
+    const languageNames = {
+      'en': 'English',
+      'de': 'German',
+      'fr': 'French',
+      'it': 'Italian',
+      'es': 'Spanish',
+      'nl': 'Dutch',
+      'pt': 'Portuguese',
+      'pl': 'Polish',
+      'ru': 'Russian',
+      'ja': 'Japanese',
+      'zh': 'Chinese'
+    };
+
+    const languageName = languageNames[languageCode] || 'English';
+
+    const prompt = `You are an SEO and content marketing expert analyzing keyword clusters for a website. Your response must be in ${languageName}.
 
 Website Context: ${websiteContext.url}
 Website Description: ${websiteContext.description || 'Not provided'}
@@ -123,35 +139,43 @@ Current Cluster:
 - Total Search Volume: ${cluster.totalSearchVolume}
 - Competition: ${cluster.avgCompetition}
 
-Task: Analyze this keyword cluster and provide:
+Task: Analyze this keyword cluster and provide the following in ${languageName}:
 1. A better, more descriptive pillar topic name (3-5 words max)
 2. A brief description of what this cluster represents (1 sentence)
-3. Content strategy recommendation (1-2 sentences)
+3. A content strategy recommendation (1-2 sentences)
 
-Respond in JSON format:
+Respond in JSON format only, with keys in English:
 {
-  "pillarTopic": "improved topic name",
-  "description": "what this cluster represents",
-  "contentStrategy": "recommendation for content"
+  "pillarTopic": "improved topic name in ${languageName}",
+  "description": "what this cluster represents in ${languageName}",
+  "contentStrategy": "recommendation for content in ${languageName}"
 }`;
 
     const result = await model.generateContent(prompt);
     const response = result.response.text();
+    console.log(`[Gemini] Raw response for pillar "${cluster.pillarTopic}" in ${languageName}:`, response);
 
     // Extract JSON from response
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const aiSuggestions = JSON.parse(jsonMatch[0]);
-
-      return {
+      console.log(`[Gemini] Parsed AI suggestions for pillar "${cluster.pillarTopic}" in ${languageName}:`, aiSuggestions);      const enhancedCluster = {
         ...cluster,
         pillarTopic: aiSuggestions.pillarTopic || cluster.pillarTopic,
         aiDescription: aiSuggestions.description,
         aiContentStrategy: aiSuggestions.contentStrategy,
         aiEnhanced: true,
       };
+      
+      console.log(`[Gemini] ✓ Enhanced cluster "${enhancedCluster.pillarTopic}" with:`, {
+        hasDescription: !!enhancedCluster.aiDescription,
+        hasStrategy: !!enhancedCluster.aiContentStrategy
+      });
+      
+      return enhancedCluster;
     }
 
+    console.log(`[Gemini] ✗ No JSON match found for "${cluster.pillarTopic}"`);
     return cluster;
   } catch (error) {
     console.warn('Gemini enhancement failed:', error.message);
@@ -162,12 +186,28 @@ Respond in JSON format:
 /**
  * Use Gemini to analyze all clusters and suggest regrouping
  */
-async function analyzeAndRegroupClusters(clusters, websiteContext, allKeywords) {
+async function analyzeAndRegroupClusters(clusters, websiteContext, allKeywords, languageCode = 'en') {
   try {
     const ai = initializeGemini();
     if (!ai) return clusters; // Return unchanged if no API key
 
     const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+
+    const languageNames = {
+      'en': 'English',
+      'de': 'German',
+      'fr': 'French',
+      'it': 'Italian',
+      'es': 'Spanish',
+      'nl': 'Dutch',
+      'pt': 'Portuguese',
+      'pl': 'Polish',
+      'ru': 'Russian',
+      'ja': 'Japanese',
+      'zh': 'Chinese'
+    };
+
+    const languageName = languageNames[languageCode] || 'English';
 
     // Create a summary of all clusters
     const clustersSummary = clusters
@@ -177,7 +217,7 @@ async function analyzeAndRegroupClusters(clusters, websiteContext, allKeywords) 
       )
       .join('\n');
 
-    const prompt = `You are an SEO strategist analyzing keyword clusters for a website.
+    const prompt = `You are an SEO strategist analyzing keyword clusters for a website. Your response must be in ${languageName}.
 
 Website: ${websiteContext.url}
 Total Keywords: ${allKeywords.length}
@@ -193,18 +233,18 @@ ${clusters
   )
   .join('\n')}
 
-Task: Analyze these clusters and:
+Task: Analyze these clusters and provide the following in ${languageName}:
 1. Identify if any clusters should be merged (too similar themes)
 2. Identify if any clusters should be split (mixed themes)
 3. Suggest better topic names for each cluster
 4. Recommend which clusters are highest priority for content creation
 
-Respond in JSON format:
+Respond in JSON format only, with keys in English:
 {
-  "mergeSuggestions": [{"clusters": [1, 2], "reason": "why merge"}],
-  "splitSuggestions": [{"cluster": 3, "reason": "why split"}],
+  "mergeSuggestions": [{"clusters": [1, 2], "reason": "why merge in ${languageName}"}],
+  "splitSuggestions": [{"cluster": 3, "reason": "why split in ${languageName}"}],
   "priorityClusters": [1, 5, 7],
-  "improvedNames": {"1": "new name for cluster 1", "2": "new name for cluster 2"}
+  "improvedNames": {"1": "new name for cluster 1 in ${languageName}", "2": "new name for cluster 2 in ${languageName}"}
 }`;
 
     const result = await model.generateContent(prompt);
@@ -241,12 +281,28 @@ Respond in JSON format:
 /**
  * Get AI-powered content brief for a cluster
  */
-async function generateContentBrief(cluster, websiteContext) {
+async function generateContentBrief(cluster, websiteContext, languageCode = 'en') {
   try {
     const ai = initializeGemini();
     if (!ai) return null;
 
     const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+
+    const languageNames = {
+      'en': 'English',
+      'de': 'German',
+      'fr': 'French',
+      'it': 'Italian',
+      'es': 'Spanish',
+      'nl': 'Dutch',
+      'pt': 'Portuguese',
+      'pl': 'Polish',
+      'ru': 'Russian',
+      'ja': 'Japanese',
+      'zh': 'Chinese'
+    };
+
+    const languageName = languageNames[languageCode] || 'English';
 
     const topKeywords = cluster.keywords.slice(0, 15).map((k) => ({
       keyword: k.keyword,
@@ -254,7 +310,7 @@ async function generateContentBrief(cluster, websiteContext) {
       competition: k.competition,
     }));
 
-    const prompt = `You are a content strategist creating a content brief.
+    const prompt = `You are a content strategist creating a content brief in ${languageName}.
 
 Website: ${websiteContext.url}
 Topic Cluster: ${cluster.pillarTopic}
@@ -263,7 +319,7 @@ Description: ${cluster.aiDescription || 'Not available'}
 Top Keywords:
 ${topKeywords.map((k) => `- ${k.keyword} (${k.volume} searches, ${k.competition} comp)`).join('\n')}
 
-Create a detailed content brief including:
+Create a detailed content brief in ${languageName} including:
 1. Recommended article title (SEO-optimized)
 2. Target word count
 3. Article outline (H2/H3 headings)
