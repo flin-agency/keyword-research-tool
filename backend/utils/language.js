@@ -63,6 +63,20 @@ const LANGUAGE_ALIASES = {
 
 const AUTO_LANGUAGE_VALUES = new Set(['auto', 'automatic', 'default', 'system']);
 
+const LANGUAGE_METADATA = {
+  en: { englishName: 'English', nativeName: 'English' },
+  de: { englishName: 'German', nativeName: 'Deutsch' },
+  fr: { englishName: 'French', nativeName: 'Français' },
+  it: { englishName: 'Italian', nativeName: 'Italiano' },
+  es: { englishName: 'Spanish', nativeName: 'Español' },
+  nl: { englishName: 'Dutch', nativeName: 'Nederlands' },
+  pt: { englishName: 'Portuguese', nativeName: 'Português' },
+  pl: { englishName: 'Polish', nativeName: 'Polski' },
+  ru: { englishName: 'Russian', nativeName: 'Русский' },
+  ja: { englishName: 'Japanese', nativeName: '日本語' },
+  zh: { englishName: 'Chinese', nativeName: '中文' },
+};
+
 function getDefaultLanguageForCountry(countryCode) {
   if (!countryCode) {
     return 'en';
@@ -109,11 +123,22 @@ function resolveLanguage(requestedLanguage, countryCode) {
   return getDefaultLanguageForCountry(countryCode);
 }
 
+function getLanguageMetadata(languageCode) {
+  if (!languageCode) {
+    return LANGUAGE_METADATA.en;
+  }
+
+  const normalized = normalizeLanguage(languageCode) || String(languageCode).trim().toLowerCase();
+  return LANGUAGE_METADATA[normalized] || LANGUAGE_METADATA.en;
+}
+
 module.exports = {
   DEFAULT_LANGUAGE_BY_COUNTRY,
   LANGUAGE_ALIASES,
   AUTO_LANGUAGE_VALUES,
+  LANGUAGE_METADATA,
   getDefaultLanguageForCountry,
   normalizeLanguage,
   resolveLanguage,
+  getLanguageMetadata,
 };

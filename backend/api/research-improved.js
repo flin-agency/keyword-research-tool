@@ -5,7 +5,7 @@ const keywordExtractor = require('../services/keyword-extractor');
 const googleAdsImproved = require('../services/google-ads-python');
 const clusteringImproved = require('../services/clustering-improved');
 const exporter = require('../services/exporter');
-const { resolveLanguage } = require('../utils/language');
+const { resolveLanguage, getLanguageMetadata, normalizeLanguage } = require('../utils/language');
 
 const router = express.Router();
 
@@ -80,9 +80,12 @@ function validateInput(req, res, next) {
  */
 router.post('/', rateLimiter, validateInput, async (req, res) => {
   try {
-    const { country, language, options = {} } = req.body;
+    const { country, language, languageLabel, options = {} } = req.body;
     const url = req.validatedUrl;
     const resolvedLanguage = resolveLanguage(language, country);
+    const normalizedInputLanguage = normalizeLanguage(language);
+    const languageMetadata = getLanguageMetadata(resolvedLanguage);
+    const requestedLanguageDisplay = languageLabel || languageMetadata.nativeName || languageMetadata.englishName;
 
     const jobId = uuidv4();
     const job = {
@@ -90,7 +93,8 @@ router.post('/', rateLimiter, validateInput, async (req, res) => {
       url,
       country,
       language: resolvedLanguage,
-      requestedLanguage: language || null,
+      requestedLanguage: requestedLanguageDisplay,
+      requestedLanguageCode: normalizedInputLanguage,
       options,
       status: 'processing',
       progress: 0,
@@ -334,6 +338,7 @@ async function processResearch(jobId, url, country = '2756', language = null, op
       useAI: options.useAI !== false,
       minClusterSize: options.minClusterSize || 3,
       language: resolvedLanguage,
+      languageLabel: job.requestedLanguage || null,
     });
 
     console.log(`[${jobId}] Created ${clusters.length} topic clusters`);
@@ -360,6 +365,7 @@ async function processResearch(jobId, url, country = '2756', language = null, op
       country: country,
       language: resolvedLanguage,
       requestedLanguage: job.requestedLanguage || null,
+      requestedLanguageCode: job.requestedLanguageCode || null,
       totalKeywords: keywordData.length,
       totalClusters: clusters.length,
       totalSearchVolume: clusters.reduce((sum, c) => sum + c.totalSearchVolume, 0),

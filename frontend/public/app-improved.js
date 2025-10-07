@@ -251,6 +251,7 @@ async function startResearch() {
   const url = urlInput.value.trim();
   const country = countrySelect.value;
   const language = languageSelect.value;
+  const languageLabel = languageSelect.options[languageSelect.selectedIndex]?.dataset?.label || '';
 
   if (!url) {
     showError('Please enter a website URL');
@@ -270,7 +271,7 @@ async function startResearch() {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ url, country, language }),
+      body: JSON.stringify({ url, country, language, languageLabel }),
     });
 
     if (!response.ok) {
