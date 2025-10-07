@@ -1,10 +1,11 @@
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
-const { GoogleAdsApi } = require('google-ads-api');
+const axios = require('axios');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const router = express.Router();
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5000';
 
 /**
  * GET /api/settings
@@ -137,25 +138,33 @@ router.post('/test', async (req, res) => {
   if (googleAds && googleAds.developerToken && googleAds.clientId &&
       googleAds.clientSecret && googleAds.refreshToken) {
     try {
-      const client = new GoogleAdsApi({
-        developer_token: googleAds.developerToken,
-        client_id: googleAds.clientId,
-        client_secret: googleAds.clientSecret,
-        refresh_token: googleAds.refreshToken,
+      const response = await axios.post(`${PYTHON_SERVICE_URL}/test-credentials`, {
+        credentials: {
+          developer_token: googleAds.developerToken,
+          client_id: googleAds.clientId,
+          client_secret: googleAds.clientSecret,
+          refresh_token: googleAds.refreshToken,
+          login_customer_id: (googleAds.loginCustomerId || '').replace(/-/g, ''),
+        },
+        keywords: ['test keyword'],
+        country: googleAds.country || '2756',
+        language: googleAds.language || 'de',
+      }, {
+        timeout: 45000,
       });
 
-      // Try to create a customer instance
-      const customerId = googleAds.loginCustomerId || '1234567890'; // Dummy ID for testing
-      const customer = client.Customer({ customer_id: customerId });
-
-      // Simple test - just check if client was created
-      if (customer) {
+      if (response.data && response.data.success) {
         results.googleAds = true;
+      } else {
+        results.errors.googleAds = response.data?.error || 'Python Google Ads service returned an unexpected response';
       }
     } catch (error) {
       console.error('Google Ads API test failed:', error);
-      results.errors.googleAds = error.message;
+      const message = error.response?.data?.error || error.message || 'Unknown error contacting Python service';
+      results.errors.googleAds = message;
     }
+  } else {
+    results.errors.googleAds = 'Missing Google Ads credentials';
   }
 
   // Test Gemini API
