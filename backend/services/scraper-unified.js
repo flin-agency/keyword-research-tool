@@ -96,17 +96,27 @@ async function scrapeWithPlaywright(url, options = {}) {
 
   try {
     // Launch browser with optimized settings
-    browser = await chromium.launch({
+    const launchOptions = {
       headless: true,
       args: [
-        '--disable-blink-features=AutomationControlled',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
         '--no-sandbox',
         '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process', // Might be useful for some environments
+        '--disable-gpu'
       ],
-      timeout: 10000,
-    });
+    };
+
+    // Use custom Chrome executable if path is provided in .env
+    if (process.env.CHROME_EXECUTABLE_PATH) {
+      console.log(`[Scraper] Using custom Chrome executable at: ${process.env.CHROME_EXECUTABLE_PATH}`);
+      launchOptions.executablePath = process.env.CHROME_EXECUTABLE_PATH;
+    }
+
+    browser = await chromium.launch(launchOptions);
 
     const context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',

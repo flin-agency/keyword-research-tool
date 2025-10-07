@@ -4,7 +4,9 @@ from google.ads.googleads.errors import GoogleAdsException
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env file from the parent directory
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(dotenv_path=dotenv_path)
 
 app = Flask(__name__)
 
