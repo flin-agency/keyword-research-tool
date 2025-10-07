@@ -20,7 +20,14 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
     algorithm = 'hybrid', // 'kmeans', 'dbscan', 'semantic', 'hybrid'
     minClusterSize = MIN_CLUSTER_SIZE,
     useAI = true,
+    language: languageCode = 'en',
+    languageLabel = null,
   } = options;
+
+  const languageOptions = {
+    code: languageCode,
+    label: languageLabel,
+  };
 
   // Validate input
   if (!keywordData || keywordData.length === 0) {
@@ -76,21 +83,22 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
     // Enhance with AI if available
     if (useAI && process.env.GEMINI_API_KEY) {
       try {
-        console.log(`[Clustering] Enhancing with Gemini AI in ${options.language || 'en'}...`);
+        console.log(`[Clustering] Enhancing with Gemini AI in ${languageCode || 'en'}...`);
 
         // First, analyze and regroup
-        clusters = await gemini.analyzeAndRegroupClusters(clusters, websiteContext, keywordData, options.language);
+        clusters = await gemini.analyzeAndRegroupClusters(clusters, websiteContext, keywordData, languageOptions);
 
         // Then enhance ALL clusters with detailed analysis
         console.log(`[Clustering] Enhancing all ${clusters.length} clusters with AI descriptions and content strategy...`);
         for (let i = 0; i < clusters.length; i++) {
           try {
-            clusters[i] = await gemini.enhanceClusterWithAI(clusters[i], websiteContext, options.language);
+            clusters[i] = await gemini.enhanceClusterWithAI(clusters[i], websiteContext, languageOptions);
             console.log(`[Clustering] Enhanced cluster ${i + 1}/${clusters.length}: "${clusters[i].pillarTopic}"`);
           } catch (error) {
             console.warn(`[Clustering] Failed to enhance cluster ${i + 1} ("${clusters[i].pillarTopic}"):`, error.message);
           }
-        }        console.log('[Clustering] AI enhancement complete');
+        }
+        console.log('[Clustering] AI enhancement complete');
         
         // Verify AI content is present
         const enhancedCount = clusters.filter(c => c.aiDescription || c.aiContentStrategy).length;

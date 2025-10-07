@@ -45,24 +45,6 @@
       opacity: 0.9;
     }
 
-    .settings-btn {
-      position: absolute;
-      right: 0;
-      top: 0;
-      background: rgba(255, 255, 255, 0.2);
-      border: 2px solid white;
-      color: white;
-      padding: 10px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 1rem;
-      transition: background 0.3s;
-    }
-
-    .settings-btn:hover {
-      background: rgba(255, 255, 255, 0.3);
-    }
-
     .card {
       background: white;
       border-radius: 12px;
@@ -124,161 +106,6 @@
 
     .btn-success:hover {
       background: #218838;
-    }
-
-    /* Modal Styles */
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 1000;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      animation: fadeIn 0.3s;
-    }
-
-    .modal.active {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .modal-content {
-      background-color: white;
-      padding: 30px;
-      border-radius: 12px;
-      width: 90%;
-      max-width: 600px;
-      max-height: 90vh;
-      overflow-y: auto;
-      animation: slideIn 0.3s;
-    }
-
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 2px solid #e0e0e0;
-    }
-
-    .modal-header h2 {
-      color: #333;
-      font-size: 1.5rem;
-    }
-
-    .close {
-      color: #aaa;
-      font-size: 28px;
-      font-weight: bold;
-      cursor: pointer;
-      line-height: 20px;
-    }
-
-    .close:hover,
-    .close:focus {
-      color: #000;
-    }
-
-    .settings-section {
-      margin-bottom: 25px;
-    }
-
-    .settings-section h3 {
-      color: #667eea;
-      margin-bottom: 15px;
-      font-size: 1.1rem;
-    }
-
-    .form-group {
-      margin-bottom: 15px;
-    }
-
-    .form-group label {
-      display: block;
-      margin-bottom: 5px;
-      color: #555;
-      font-weight: 500;
-    }
-
-    .form-group input,
-    .form-group textarea {
-      width: 100%;
-      padding: 10px;
-      border: 2px solid #e0e0e0;
-      border-radius: 6px;
-      font-size: 0.95rem;
-      font-family: inherit;
-    }
-
-    .form-group textarea {
-      min-height: 80px;
-      resize: vertical;
-    }
-
-    .form-group input:focus,
-    .form-group textarea:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-
-    .form-group small {
-      display: block;
-      margin-top: 5px;
-      color: #666;
-      font-size: 0.85rem;
-    }
-
-    .api-status {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 0.85rem;
-      font-weight: 500;
-      margin-left: 10px;
-    }
-
-    .api-status.configured {
-      background: #d4edda;
-      color: #155724;
-    }
-
-    .api-status.not-configured {
-      background: #f8d7da;
-      color: #721c24;
-    }
-
-    .modal-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 20px;
-      padding-top: 15px;
-      border-top: 2px solid #e0e0e0;
-    }
-
-    .button-group {
-      display: flex;
-      gap: 10px;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-
-    @keyframes slideIn {
-      from {
-        transform: translateY(-50px);
-        opacity: 0;
-      }
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
     }
 
     .progress-container {
@@ -479,15 +306,14 @@
 <body>
   <div class="container">
     <div class="header">
-      <button class="settings-btn" id="settingsBtn">⚙️ API Settings</button>
       <h1>🔍 Keyword Research Tool</h1>
       <p>Discover valuable keywords and topic clusters for your website</p>
     </div>
 
-    <div class="card">
-      <div id="apiWarning" class="warning-banner">
-        ⚠️ Google Ads API not configured. Results will use simulated data. Configure API in Settings to get real data.
-      </div>
+      <div class="card">
+        <div id="apiWarning" class="warning-banner visible">
+          ⚠️ Provide valid Google Ads and Gemini credentials via environment variables to enable live data.
+        </div>
 
       <div class="input-group">
         <input
@@ -510,18 +336,17 @@
           <option value="2724">🇪🇸 Spain</option>
         </select>
         <select id="languageSelect">
-          <option value="">Auto (by country)</option>
-          <option value="en">🇬🇧 English</option>
-          <option value="de">🇩🇪 German</option>
-          <option value="fr">🇫🇷 French</option>
-          <option value="it">🇮🇹 Italian</option>
-          <option value="es">🇪🇸 Spanish</option>
-          <option value="nl">🇳🇱 Dutch</option>
-          <option value="pt">🇵🇹 Portuguese</option>
-          <option value="pl">🇵🇱 Polish</option>
-          <option value="ru">🇷🇺 Russian</option>
-          <option value="ja">🇯🇵 Japanese</option>
-          <option value="zh">🇨🇳 Chinese</option>
+          <option value="en" data-label="English" selected>🇬🇧 English</option>
+          <option value="de" data-label="Deutsch">🇩🇪 Deutsch</option>
+          <option value="fr" data-label="Français">🇫🇷 Français</option>
+          <option value="it" data-label="Italiano">🇮🇹 Italiano</option>
+          <option value="es" data-label="Español">🇪🇸 Español</option>
+          <option value="nl" data-label="Nederlands">🇳🇱 Nederlands</option>
+          <option value="pt" data-label="Português">🇵🇹 Português</option>
+          <option value="pl" data-label="Polski">🇵🇱 Polski</option>
+          <option value="ru" data-label="Русский">🇷🇺 Русский</option>
+          <option value="ja" data-label="日本語">🇯🇵 日本語</option>
+          <option value="zh" data-label="中文">🇨🇳 中文</option>
         </select>
         <button class="btn" id="startBtn">Start Research</button>
       </div>
@@ -554,68 +379,7 @@
     </div>
   </div>
 
-  <!-- Settings Modal -->
-  <div id="settingsModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>API Settings</h2>
-        <span class="close" id="closeModal">&times;</span>
-      </div>
-
-      <div class="settings-section">
-        <h3>Google Ads API
-          <span id="googleAdsStatus" class="api-status">Not Configured</span>
-        </h3>
-        <div class="form-group">
-          <label for="developerToken">Developer Token</label>
-          <input type="text" id="developerToken" placeholder="Your Google Ads developer token">
-          <small>Get from Google Ads API Center</small>
-        </div>
-        <div class="form-group">
-          <label for="clientId">Client ID</label>
-          <input type="text" id="clientId" placeholder="OAuth2 Client ID">
-          <small>From Google Cloud Console</small>
-        </div>
-        <div class="form-group">
-          <label for="clientSecret">Client Secret</label>
-          <input type="password" id="clientSecret" placeholder="OAuth2 Client Secret">
-          <small>From Google Cloud Console</small>
-        </div>
-        <div class="form-group">
-          <label for="refreshToken">Refresh Token</label>
-          <textarea id="refreshToken" placeholder="OAuth2 Refresh Token"></textarea>
-          <small>Generate using OAuth2 flow with Google Ads scope</small>
-        </div>
-        <div class="form-group">
-          <label for="loginCustomerId">Login Customer ID (Manager Account)</label>
-          <input type="text" id="loginCustomerId" placeholder="123-456-7890">
-          <small>Your Google Ads manager account ID (without dashes)</small>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h3>Gemini AI
-          <span id="geminiStatus" class="api-status">Not Configured</span>
-        </h3>
-        <div class="form-group">
-          <label for="geminiApiKey">API Key</label>
-          <input type="password" id="geminiApiKey" placeholder="Your Gemini API key">
-          <small>Get from Google AI Studio</small>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <div>
-          <button class="btn btn-secondary" id="testConnection">Test Connection</button>
-        </div>
-        <div class="button-group">
-          <button class="btn btn-secondary" id="cancelSettings">Cancel</button>
-          <button class="btn btn-success" id="saveSettings">Save Settings</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script src="app-improved.js"></script>
 </body>
 </html>
+

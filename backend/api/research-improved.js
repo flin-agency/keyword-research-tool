@@ -1,10 +1,11 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const scraperUnified = require('../services/scraper-unified');
-const keywordExtractor = require('../services/keyword-extractor');
+const { extractKeywordsWithAI } = require('../services/gemini');
 const googleAdsImproved = require('../services/google-ads-python');
 const clusteringImproved = require('../services/clustering-improved');
 const exporter = require('../services/exporter');
+const { resolveLanguage, getLanguageMetadata, normalizeLanguage } = require('../utils/language');
 
 const router = express.Router();
 
@@ -73,21 +74,72 @@ function validateInput(req, res, next) {
   next();
 }
 
+function sanitizeKeywordCandidate(value) {
+  if (!value) return null;
+
+  const trimmed = value.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!trimmed) return null;
+
+  const wordCount = trimmed.split(' ').length;
+
+  // Avoid sentences that are too long or look like boilerplate copy
+  if (wordCount > 6 || trimmed.length > 80) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function buildFallbackKeywords(scrapedContent) {
+  const fallback = new Set();
+
+  scrapedContent.pages.forEach((page) => {
+    const titleCandidate = sanitizeKeywordCandidate(page.title);
+    if (titleCandidate) fallback.add(titleCandidate);
+
+    const metaCandidate = sanitizeKeywordCandidate(page.metaDescription);
+    if (metaCandidate) fallback.add(metaCandidate);
+
+    [...(page.headings?.h1 || []), ...(page.headings?.h2 || []), ...(page.headings?.h3 || [])]
+      .map(sanitizeKeywordCandidate)
+      .filter(Boolean)
+      .forEach((candidate) => fallback.add(candidate));
+  });
+
+  return Array.from(fallback).slice(0, 100);
+}
+
+async function generateSeedKeywords(scrapedContent, languageCode) {
+  const aiKeywords = await extractKeywordsWithAI(scrapedContent, 150, languageCode);
+  if (Array.isArray(aiKeywords) && aiKeywords.length > 0) {
+    return aiKeywords;
+  }
+
+  console.warn('[Keywords] Gemini extraction unavailable, falling back to headings-based keywords');
+  return buildFallbackKeywords(scrapedContent);
+}
+
 /**
  * POST /api/research
  * Start a new keyword research job
  */
 router.post('/', rateLimiter, validateInput, async (req, res) => {
   try {
-    const { country, language, options = {} } = req.body;
+    const { country, language, languageLabel, options = {} } = req.body;
     const url = req.validatedUrl;
+    const resolvedLanguage = resolveLanguage(language, country);
+    const normalizedInputLanguage = normalizeLanguage(language);
+    const languageMetadata = getLanguageMetadata(resolvedLanguage);
+    const requestedLanguageDisplay = languageLabel || languageMetadata.nativeName || languageMetadata.englishName;
 
     const jobId = uuidv4();
     const job = {
       id: jobId,
       url,
       country,
-      language,
+      language: resolvedLanguage,
+      requestedLanguage: requestedLanguageDisplay,
+      requestedLanguageCode: normalizedInputLanguage,
       options,
       status: 'processing',
       progress: 0,
@@ -102,7 +154,7 @@ router.post('/', rateLimiter, validateInput, async (req, res) => {
     jobs.set(jobId, job);
 
     // Start processing asynchronously
-    processResearch(jobId, url, country, language, options);
+    processResearch(jobId, url, country, resolvedLanguage, options);
 
     // Clean old jobs (older than 24 hours)
     cleanOldJobs();
@@ -247,6 +299,8 @@ async function processResearch(jobId, url, country = '2756', language = null, op
   if (!job) return;
 
   const startTime = Date.now();
+  const resolvedLanguage = resolveLanguage(language, country);
+  updateJob(job, { language: resolvedLanguage });
 
   try {
     // Step 1: Scrape website (30% of progress)
@@ -284,10 +338,10 @@ async function processResearch(jobId, url, country = '2756', language = null, op
     // Step 2: Extract keywords (40% of progress)
     console.log(`[${jobId}] Extracting keywords with AI`);
 
-    const seedKeywords = await keywordExtractor.extractKeywords(content, language);
+    const seedKeywords = await generateSeedKeywords(content, resolvedLanguage);
 
     if (!seedKeywords || seedKeywords.length === 0) {
-      throw new Error('No keywords could be extracted from the website content');
+      throw new Error('No keywords could be extracted from the provided content');
     }
 
     console.log(`[${jobId}] Extracted ${seedKeywords.length} seed keywords`);
@@ -301,7 +355,7 @@ async function processResearch(jobId, url, country = '2756', language = null, op
     // Step 3: Get keyword metrics (60% of progress)
     console.log(`[${jobId}] Fetching metrics from Google Ads API`);
 
-    const keywordData = await googleAdsImproved.getKeywordMetrics(seedKeywords, country, language);
+    const keywordData = await googleAdsImproved.getKeywordMetrics(seedKeywords, country, resolvedLanguage);
 
     if (!keywordData || keywordData.length === 0) {
       throw new Error('Google Ads API returned no keyword data. Please check your API configuration and credentials.');
@@ -328,7 +382,8 @@ async function processResearch(jobId, url, country = '2756', language = null, op
       algorithm: options.clusterAlgorithm || 'hybrid',
       useAI: options.useAI !== false,
       minClusterSize: options.minClusterSize || 3,
-      language: language,
+      language: resolvedLanguage,
+      languageLabel: job.requestedLanguage || null,
     });
 
     console.log(`[${jobId}] Created ${clusters.length} topic clusters`);
@@ -336,7 +391,9 @@ async function processResearch(jobId, url, country = '2756', language = null, op
     updateJob(job, {
       progress: 90,
       step: 'finalizing results',
-    });    // Step 5: Prepare final results
+    });
+
+    // Step 5: Prepare final results
     const processingTime = Date.now() - startTime;
 
     // Log AI content before preparing final data
@@ -353,7 +410,9 @@ async function processResearch(jobId, url, country = '2756', language = null, op
     const finalData = {
       url,
       country: country,
-      language: language || 'en',
+      language: resolvedLanguage,
+      requestedLanguage: job.requestedLanguage || null,
+      requestedLanguageCode: job.requestedLanguageCode || null,
       totalKeywords: keywordData.length,
       totalClusters: clusters.length,
       totalSearchVolume: clusters.reduce((sum, c) => sum + c.totalSearchVolume, 0),

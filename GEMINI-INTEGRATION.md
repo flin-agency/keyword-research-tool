@@ -227,7 +227,7 @@ Error: Resource has been exhausted (e.g. check quota).
 
 If AI enhancement is too slow, you can:
 
-1. Reduce clusters analyzed: Edit `clustering.js` line 75
+1. Reduce clusters analyzed: Edit `clustering-improved.js` line 75
    ```javascript
    for (let i = 0; i < Math.min(3, sortedClusters.length); i++) {
    // Changed from 5 to 3
@@ -270,16 +270,15 @@ GEMINI_ENHANCE_LIMIT=5  # Default
    - Cluster enhancement functions
    - Content strategy generation
 
-2. **`backend/services/clustering.js`** (MODIFIED)
-   - Added `async` to main function
+2. **`backend/services/clustering-improved.js`** (MODIFIED)
    - Calls Gemini after ML clustering
-   - Passes website context
+   - Passes website context and language metadata
 
-3. **`backend/api/research.js`** (MODIFIED)
+3. **`backend/api/research-improved.js`** (MODIFIED)
    - Passes website context to clustering
-   - Awaits clustering results
+   - Awaits clustering results and preserves language labels
 
-4. **`frontend/public/app.js`** (MODIFIED)
+4. **`frontend/public/app-improved.js`** (MODIFIED)
    - Displays AI badges
    - Shows descriptions & strategies
    - Highlights priority clusters

@@ -22,7 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
 async function startResearch() {
   const url = document.getElementById('urlInput').value.trim();
   const country = document.getElementById('countrySelect').value;
-  const language = document.getElementById('languageSelect').value;
+  const languageSelect = document.getElementById('languageSelect');
+  const language = languageSelect.value;
+  const languageLabel = languageSelect.options[languageSelect.selectedIndex]?.dataset?.label || '';
 
   if (!url) {
     showError('Please enter a URL');
@@ -37,10 +39,7 @@ async function startResearch() {
 
   try {
     // Start research job
-    const payload = { url, country };
-    if (language) {
-      payload.language = language;
-    }
+    const payload = { url, country, language, languageLabel };
 
     const response = await fetch(`${API_URL}/research`, {
       method: 'POST',

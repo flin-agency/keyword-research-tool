@@ -106,36 +106,38 @@ Same Google Ads API credentials as above, plus:
 |----------|-------------|----------|
 | `PYTHON_SERVICE_PORT` | Port for Python service (default: 5001) | No |
 
-\* Without Google Ads API credentials, the tool uses mock data for testing
-\*\* Without Gemini API key, the tool falls back to traditional NLP extraction
-
 ## 🏗️ Project Structure
 
 ```
 keyword-research-tool/
 ├── backend/
 │   ├── api/
+│   │   ├── auth-google.js
+│   │   ├── refresh-token.js
 │   │   └── research-improved.js     # Main API endpoints
 │   ├── services/
 │   │   ├── scraper-unified.js       # Multi-strategy web scraping
-│   │   ├── keyword-extractor.js     # AI + NLP keyword extraction
 │   │   ├── google-ads-python.js     # Python microservice client
-│   │   ├── clustering-improved.js   # ML-based topic clustering
-│   │   ├── gemini.js                # Gemini AI service
+│   │   ├── clustering-improved.js   # ML + AI topic clustering
+│   │   ├── gemini.js                # Gemini AI helpers
 │   │   └── exporter.js              # CSV/JSON export
 │   ├── utils/
 │   │   └── demo-data.js             # Demo/fallback data
-│   └── server-improved.js           # Express server
+│   ├── server.js                    # Express server (improved stack)
+│   └── server-improved.js           # Advanced bootstrap
 ├── python-ads-service/              # Python microservice (Google Ads API v21)
 │   ├── app.py                       # Flask service
 │   ├── requirements.txt             # Python dependencies
 │   └── .env.example                 # Python service env template
 ├── frontend/
 │   └── public/
-│       ├── index.html               # Web interface
-│       └── app.js                   # Frontend logic
+│       ├── index-improved.html      # Primary UI
+│       ├── app-improved.js          # Frontend logic
+│       ├── index-simple.html        # Legacy simple UI
+│       └── app.js                   # Legacy script
 ├── tests/
-│   └── *.test.js                    # Unit tests
+│   ├── exporter.test.js
+│   └── scraper.test.js
 ├── .env.example                     # Main service env template
 ├── package.json
 └── README.md
@@ -152,11 +154,11 @@ The tool uses a **microservice architecture** with two main components:
 
 ### Workflow
 
-1. **Website Scanning** - Scrapes your target website using Playwright/Axios
-2. **AI Keyword Extraction** - Gemini AI analyzes content and extracts marketing-relevant keywords
-3. **Google Ads Enrichment** - Node.js service calls Python microservice which fetches real search volumes, CPC, and competition data from Google Ads API v21
-4. **Smart Clustering** - Groups keywords into topics using K-Means ML algorithm
-5. **AI Enhancement** - Gemini refines cluster names and provides content strategies
+1. **Website Scanning** - Scrapes your target website using the unified Puppeteer strategies
+2. **AI Keyword Extraction** - Gemini AI analyzes content and extracts marketing-relevant keywords (with a headings fallback)
+3. **Google Ads Enrichment** - Node.js service calls the Python microservice which fetches real search volumes, CPC, and competition data from Google Ads API v21
+4. **Smart Clustering** - Groups keywords using hybrid density/semantic clustering and scores clusters
+5. **AI Enhancement** - Gemini refines cluster names and provides localized content strategies
 6. **Results Display** - Shows organized topics with full metrics and export options
 
 ## 📊 API Endpoints

@@ -6,10 +6,8 @@ const path = require('path');
 // Load environment variables
 dotenv.config();
 
-// Import routers - use improved version if available
-const researchRouter = process.env.USE_IMPROVED_API === 'true'
-  ? require('./api/research-improved')
-  : require('./api/research');
+// Import routers
+const researchRouter = require('./api/research-improved');
 
 const refreshTokenRouter = require('./api/refresh-token');
 const authRouter = require('./api/auth-google');
@@ -204,7 +202,7 @@ if (require.main === module) {
     console.log('[Server] Starting Keyword Research Tool');
     console.log(`[Server] Environment: ${config.environment}`);
     console.log(`[Server] Port: ${PORT}`);
-    console.log(`[Server] API: ${process.env.USE_IMPROVED_API === 'true' ? 'Improved' : 'Original'}`);
+    console.log('[Server] API: Improved');
     console.log(`[Server] Google Ads API: ${process.env.GOOGLE_ADS_DEVELOPER_TOKEN ? 'Configured' : 'Not configured'}`);
     console.log(`[Server] Gemini AI: ${process.env.GEMINI_API_KEY ? 'Configured' : 'Not configured'}`);
     console.log(`[Server] Ready at http://localhost:${PORT}`);
