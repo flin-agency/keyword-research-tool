@@ -87,8 +87,8 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
       clusters = clusters.filter(c => c.keywords.length >= minClusterSize);
     }
 
-    // Ensure clusters are semantically distinct before scoring
-    clusters = enforceDistinctTopics(clusters);
+    // Ensure each keyword only belongs to one cluster before AI review
+    clusters = ensureUniqueKeywords(clusters);
     clusters = clusters.filter(c => c.keywords.length >= minClusterSize);
 
     // Sort clusters by value score
@@ -100,7 +100,20 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
         console.log(`[Clustering] Enhancing with Gemini AI in ${languageCode || 'en'}...`);
 
         // First, analyze and regroup
-        clusters = await gemini.analyzeAndRegroupClusters(clusters, websiteContext, keywordData, languageOptions);
+        clusters = await gemini.analyzeAndRegroupClusters(
+          clusters,
+          websiteContext,
+          keywordData,
+          languageOptions
+        );
+
+        // Let Gemini audit the topical boundaries and keyword placement
+        clusters = await gemini.scrutinizeClusterTopics(
+          clusters,
+          keywordData,
+          websiteContext,
+          languageOptions
+        );
 
         // Then enhance ALL clusters with detailed analysis
         console.log(`[Clustering] Enhancing all ${clusters.length} clusters with AI descriptions and content strategy...`);
@@ -128,7 +141,8 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
       }
     }
 
-    return clusters;
+    // Final safety pass to guarantee keyword uniqueness
+    return ensureUniqueKeywords(clusters);
 
   } catch (error) {
     console.error('[Clustering] Error:', error);
@@ -645,167 +659,74 @@ function calculateClusterSimilarity(cluster1, cluster2) {
 /**
  * Ensure clusters cover distinct intents and do not share semantically overlapping keywords
  */
-function enforceDistinctTopics(clusters) {
-  if (!Array.isArray(clusters) || clusters.length <= 1) {
-    return clusters;
+function ensureUniqueKeywords(clusters) {
+  if (!Array.isArray(clusters) || clusters.length === 0) {
+    return [];
   }
 
-  const workingClusters = clusters.map(cluster => ({
+  const normalizedClusters = clusters.map(cluster => ({
     ...cluster,
-    keywords: [...cluster.keywords],
+    keywords: [],
   }));
 
-  const removedIndexes = new Set();
-
-  for (let i = 0; i < workingClusters.length; i++) {
-    if (removedIndexes.has(i)) continue;
-
-    for (let j = i + 1; j < workingClusters.length; j++) {
-      if (removedIndexes.has(j)) continue;
-
-      const similarity = calculateClusterSimilarity(workingClusters[i], workingClusters[j]);
-      const intentOverlap = calculateIntentOverlap(workingClusters[i], workingClusters[j]);
-
-      if (similarity > 0.65 || intentOverlap > 0.55) {
-        const targetIndex = workingClusters[i].totalSearchVolume >= workingClusters[j].totalSearchVolume ? i : j;
-        const sourceIndex = targetIndex === i ? j : i;
-
-        const targetCluster = workingClusters[targetIndex];
-        const sourceCluster = workingClusters[sourceIndex];
-
-        const existingKeywords = new Map();
-        targetCluster.keywords.forEach(keyword => {
-          existingKeywords.set(keyword.keyword.toLowerCase(), keyword);
-        });
-
-        sourceCluster.keywords.forEach(keyword => {
-          const normalized = keyword.keyword.toLowerCase();
-          if (!existingKeywords.has(normalized)) {
-            targetCluster.keywords.push(keyword);
-            existingKeywords.set(normalized, keyword);
-          } else {
-            const existingKeyword = existingKeywords.get(normalized);
-            const existingScore = calculateSemanticSimilarity(existingKeyword.keyword, targetCluster.pillarTopic);
-            const candidateScore = calculateSemanticSimilarity(keyword.keyword, targetCluster.pillarTopic);
-            if (candidateScore > existingScore + 0.05) {
-              const indexToReplace = targetCluster.keywords.findIndex(
-                k => k.keyword.toLowerCase() === normalized
-              );
-              if (indexToReplace !== -1) {
-                targetCluster.keywords[indexToReplace] = keyword;
-                existingKeywords.set(normalized, keyword);
-              }
-            }
-          }
-        });
-
-        removedIndexes.add(sourceIndex);
-      }
-    }
-  }
-
   const keywordOwners = new Map();
-  const dedupedClusters = [];
 
-  workingClusters.forEach((cluster, index) => {
-    if (removedIndexes.has(index)) return;
-
-    const uniqueKeywords = [];
+  clusters.forEach((cluster, clusterIndex) => {
+    if (!cluster || !Array.isArray(cluster.keywords)) return;
 
     cluster.keywords.forEach(keyword => {
-      const normalized = keyword.keyword.toLowerCase();
-      const candidateScore = calculateSemanticSimilarity(keyword.keyword, cluster.pillarTopic);
-
-      if (!keywordOwners.has(normalized)) {
-        keywordOwners.set(normalized, { index: dedupedClusters.length, score: candidateScore });
-        uniqueKeywords.push(keyword);
+      if (!keyword || typeof keyword.keyword !== 'string') {
         return;
       }
 
-      const owner = keywordOwners.get(normalized);
-      const existingCluster = dedupedClusters[owner.index];
+      const normalized = keyword.keyword.trim().toLowerCase();
+      if (!normalized) return;
 
-      if (!existingCluster) {
-        keywordOwners.set(normalized, { index: dedupedClusters.length, score: candidateScore });
-        uniqueKeywords.push(keyword);
-        return;
-      }
+      const affinity = calculateSemanticSimilarity(keyword.keyword, cluster.pillarTopic || '');
+      const currentOwner = keywordOwners.get(normalized);
 
-      if (candidateScore > owner.score + 0.05) {
-        existingCluster.keywords = existingCluster.keywords.filter(
-          existingKeyword => existingKeyword.keyword.toLowerCase() !== normalized
-        );
-        keywordOwners.set(normalized, { index: dedupedClusters.length, score: candidateScore });
-        uniqueKeywords.push(keyword);
+      if (!currentOwner || affinity > currentOwner.affinity + 0.02) {
+        if (currentOwner) {
+          const ownerCluster = normalizedClusters[currentOwner.clusterIndex];
+          ownerCluster.keywords = ownerCluster.keywords.filter(
+            existingKeyword => existingKeyword.keyword.trim().toLowerCase() !== normalized
+          );
+        }
+
+        normalizedClusters[clusterIndex].keywords.push(keyword);
+        keywordOwners.set(normalized, { clusterIndex, affinity });
       }
     });
-
-    if (uniqueKeywords.length >= MIN_CLUSTER_SIZE) {
-      dedupedClusters.push({
-        ...cluster,
-        keywords: uniqueKeywords,
-      });
-    }
   });
 
-  const cleanedClusters = [];
   const orphanKeywords = [];
+  const resultClusters = [];
 
-  dedupedClusters.forEach(cluster => {
+  normalizedClusters.forEach(cluster => {
+    if (!cluster) return;
+
     if (cluster.keywords.length >= MIN_CLUSTER_SIZE) {
-      cleanedClusters.push(cluster);
+      resultClusters.push(
+        createClusterObject(resultClusters.length + 1, cluster.keywords, cluster.algorithm || 'hybrid')
+      );
     } else {
       orphanKeywords.push(...cluster.keywords);
     }
   });
 
-  if (orphanKeywords.length > 0 && cleanedClusters.length > 0) {
+  if (orphanKeywords.length > 0 && resultClusters.length > 0) {
     orphanKeywords.forEach(keyword => {
-      const bestCluster = findBestClusterForKeyword(keyword, cleanedClusters);
-      if (bestCluster && !bestCluster.keywords.some(k => k.keyword === keyword.keyword)) {
+      const bestCluster = findBestClusterForKeyword(keyword, resultClusters);
+      if (
+        bestCluster &&
+        !bestCluster.keywords.some(existing => existing.keyword.trim().toLowerCase() === keyword.keyword.trim().toLowerCase())
+      ) {
         bestCluster.keywords.push(keyword);
       }
     });
   }
 
-  return cleanedClusters.map((cluster, idx) =>
-    createClusterObject(idx + 1, cluster.keywords, cluster.algorithm || 'hybrid-dedup')
-  );
-}
-
-/**
- * Calculate overlap of intent-defining tokens between clusters
- */
-function calculateIntentOverlap(cluster1, cluster2) {
-  const tokens1 = collectIntentTokens(cluster1);
-  const tokens2 = collectIntentTokens(cluster2);
-
-  if (tokens1.size === 0 || tokens2.size === 0) {
-    return 0;
-  }
-
-  const intersection = [...tokens1].filter(token => tokens2.has(token));
-  const union = new Set([...tokens1, ...tokens2]);
-
-  return intersection.length / union.size;
-}
-
-function collectIntentTokens(cluster) {
-  const tokens = new Set();
-
-  extractIntentTokens(cluster.pillarTopic).forEach(token => tokens.add(token));
-  cluster.keywords.slice(0, 5).forEach(keyword => {
-    extractIntentTokens(keyword.keyword).forEach(token => tokens.add(token));
-  });
-
-  return tokens;
-}
-
-function extractIntentTokens(text) {
-  return tokenizer
-    .tokenize(text.toLowerCase())
-    .map(token => stemmer.stem(token))
-    .filter(token => token.length > 2 && !STEMMED_STOP_WORDS.has(token));
+  return resultClusters;
 }
 
 /**

@@ -273,6 +273,150 @@ Respond in JSON format only, with keys in English:
 }
 
 /**
+ * Ask Gemini to audit cluster boundaries and enforce unique keyword ownership
+ */
+async function scrutinizeClusterTopics(clusters, allKeywords = [], websiteContext = {}, languageInput = 'en') {
+  try {
+    const ai = initializeGemini();
+    if (!ai) return clusters;
+
+    if (!Array.isArray(clusters) || clusters.length === 0) {
+      return clusters;
+    }
+
+    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const { displayName: languageName, primary: primaryLanguage } = buildLanguageContext(languageInput);
+
+    const duplicateHints = buildDuplicateHints(clusters);
+    const summaries = clusters.map((cluster, index) => ({
+      id: index + 1,
+      pillarTopic: cluster.pillarTopic,
+      keywordCount: Array.isArray(cluster.keywords) ? cluster.keywords.length : 0,
+      topKeywords: (cluster.keywords || [])
+        .slice(0, 25)
+        .map(keyword => keyword.keyword)
+        .filter(Boolean),
+    }));
+
+    const prompt = `You are an SEO topic clustering supervisor. Your job is to make sure every keyword belongs to exactly one topic cluster and that each cluster's intent is clearly separated from the others. Work in ${languageName}.
+
+Website: ${websiteContext.url || 'unknown'}
+Total clusters: ${clusters.length}
+
+Existing clusters (id, name, size, sample keywords):
+${summaries
+  .map(
+    summary =>
+      `#${summary.id} ${summary.pillarTopic || 'Unnamed'} (${summary.keywordCount} keywords) -> ${summary.topKeywords.join(', ')}`
+  )
+  .join('\n')}
+
+Potential duplicate keywords detected before your review:
+${duplicateHints.length > 0 ? duplicateHints.map(d => `- ${d.keyword}: clusters ${d.clusters.join(', ')}`).join('\n') : 'none'}
+
+Your task:
+- Identify any keywords that should move to a different cluster so that no keyword appears in more than one cluster.
+- Flag clusters whose intent overlaps heavily with another cluster and suggest whether to merge them.
+- Suggest better pillar topic names when needed to clarify intent.
+
+Respond ONLY with valid JSON using this shape:
+{
+  "keywordAssignments": [
+    {"keyword": "keyword phrase", "cluster": 2, "reason": "short explanation in ${primaryLanguage}"}
+  ],
+  "mergeSuggestions": [
+    {"clusters": [1, 3], "reason": "why in ${primaryLanguage}"}
+  ],
+  "clusterRenames": {
+    "1": "new name in ${primaryLanguage}"
+  },
+  "notes": ["Optional extra observations in ${primaryLanguage}"]
+}
+
+Only include arrays when you have suggestions; otherwise use empty arrays.`;
+
+    const result = await model.generateContent(prompt);
+    const response = result.response.text();
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      return clusters;
+    }
+
+    const analysis = JSON.parse(jsonMatch[0]);
+    const keywordUniverse = buildKeywordUniverse(allKeywords, clusters);
+    const workingClusters = clusters.map(cluster => ({
+      ...cluster,
+      keywords: Array.isArray(cluster.keywords) ? [...cluster.keywords] : [],
+    }));
+
+    if (analysis.clusterRenames && typeof analysis.clusterRenames === 'object') {
+      Object.entries(analysis.clusterRenames).forEach(([clusterId, newName]) => {
+        const index = parseInt(clusterId, 10) - 1;
+        if (!Number.isNaN(index) && workingClusters[index] && typeof newName === 'string' && newName.trim()) {
+          workingClusters[index].pillarTopic = newName.trim();
+        }
+      });
+    }
+
+    if (Array.isArray(analysis.mergeSuggestions)) {
+      analysis.mergeSuggestions.forEach(suggestion => {
+        const clusterIds = Array.isArray(suggestion?.clusters) ? suggestion.clusters : [];
+        if (clusterIds.length < 2) return;
+
+        const primaryIndex = parseInt(clusterIds[0], 10) - 1;
+        if (Number.isNaN(primaryIndex) || !workingClusters[primaryIndex]) return;
+
+        clusterIds.slice(1).forEach(id => {
+          const index = parseInt(id, 10) - 1;
+          if (Number.isNaN(index) || index === primaryIndex || !workingClusters[index]) return;
+
+          const clusterToMerge = workingClusters[index];
+          const keywordsToMove = [...(clusterToMerge.keywords || [])];
+          clusterToMerge.keywords = [];
+
+          keywordsToMove.forEach(keywordObj => {
+            applyKeywordAssignment(
+              keywordObj.keyword,
+              primaryIndex,
+              workingClusters,
+              keywordUniverse
+            );
+          });
+        });
+      });
+    }
+
+    if (Array.isArray(analysis.keywordAssignments)) {
+      analysis.keywordAssignments.forEach(assignment => {
+        const keyword = typeof assignment?.keyword === 'string' ? assignment.keyword : null;
+        const targetClusterId =
+          assignment?.cluster ?? assignment?.clusterId ?? assignment?.to ?? assignment?.preferredCluster;
+
+        const targetIndex = typeof targetClusterId === 'number'
+          ? targetClusterId - 1
+          : parseInt(targetClusterId, 10) - 1;
+
+        if (!keyword || Number.isNaN(targetIndex) || !workingClusters[targetIndex]) {
+          return;
+        }
+
+        applyKeywordAssignment(keyword, targetIndex, workingClusters, keywordUniverse);
+      });
+    }
+
+    const cleanedClusters = workingClusters
+      .map(cluster => recalculateClusterMetrics(cluster))
+      .filter(cluster => cluster.keywords.length > 0);
+
+    return cleanedClusters;
+  } catch (error) {
+    console.warn('Gemini topic audit failed:', error.message);
+    return clusters;
+  }
+}
+
+/**
  * Get AI-powered content brief for a cluster
  */
 async function generateContentBrief(cluster, websiteContext, languageCode = 'en') {
@@ -322,5 +466,126 @@ module.exports = {
   extractKeywordsWithAI,
   enhanceClusterWithAI,
   analyzeAndRegroupClusters,
+  scrutinizeClusterTopics,
   generateContentBrief,
 };
+
+function buildDuplicateHints(clusters) {
+  const duplicates = new Map();
+
+  clusters.forEach((cluster, index) => {
+    (cluster.keywords || []).forEach(keywordObj => {
+      if (!keywordObj || typeof keywordObj.keyword !== 'string') return;
+
+      const normalized = keywordObj.keyword.trim().toLowerCase();
+      if (!normalized) return;
+
+      if (!duplicates.has(normalized)) {
+        duplicates.set(normalized, new Set());
+      }
+
+      duplicates.get(normalized).add(index + 1);
+    });
+  });
+
+  return [...duplicates.entries()]
+    .filter(([, owners]) => owners.size > 1)
+    .map(([keyword, owners]) => ({ keyword, clusters: [...owners] }));
+}
+
+function buildKeywordUniverse(allKeywords, clusters) {
+  const universe = new Map();
+
+  (Array.isArray(allKeywords) ? allKeywords : []).forEach(keywordObj => {
+    if (!keywordObj || typeof keywordObj.keyword !== 'string') return;
+    const normalized = keywordObj.keyword.trim().toLowerCase();
+    if (normalized && !universe.has(normalized)) {
+      universe.set(normalized, keywordObj);
+    }
+  });
+
+  clusters.forEach(cluster => {
+    (cluster.keywords || []).forEach(keywordObj => {
+      if (!keywordObj || typeof keywordObj.keyword !== 'string') return;
+      const normalized = keywordObj.keyword.trim().toLowerCase();
+      if (normalized && !universe.has(normalized)) {
+        universe.set(normalized, keywordObj);
+      }
+    });
+  });
+
+  return universe;
+}
+
+function applyKeywordAssignment(keyword, targetIndex, clusters, keywordUniverse) {
+  const normalized = normalizeKeyword(keyword);
+  if (!normalized || !Array.isArray(clusters) || !clusters[targetIndex]) {
+    return;
+  }
+
+  const keywordData = keywordUniverse.get(normalized) || {
+    keyword,
+    searchVolume: 0,
+    competition: 'unknown',
+    cpc: 0,
+  };
+
+  clusters.forEach(cluster => {
+    if (!cluster || !Array.isArray(cluster.keywords)) return;
+    cluster.keywords = cluster.keywords.filter(
+      keywordObj => normalizeKeyword(keywordObj.keyword) !== normalized
+    );
+  });
+
+  const targetCluster = clusters[targetIndex];
+  if (!targetCluster.keywords.some(k => normalizeKeyword(k.keyword) === normalized)) {
+    targetCluster.keywords.push(keywordData);
+  }
+}
+
+function recalculateClusterMetrics(cluster) {
+  const keywords = Array.isArray(cluster.keywords) ? cluster.keywords : [];
+  const sortedKeywords = [...keywords].sort((a, b) => (b.searchVolume || 0) - (a.searchVolume || 0));
+
+  const totalSearchVolume = sortedKeywords.reduce(
+    (sum, keyword) => sum + (keyword?.searchVolume || 0),
+    0
+  );
+
+  const keywordCount = sortedKeywords.length;
+  const avgSearchVolume = keywordCount > 0 ? Math.round(totalSearchVolume / keywordCount) : 0;
+
+  const competitionValues = { low: 1, medium: 2, high: 3, unknown: 2, unspecified: 2 };
+  const avgCompetitionValue = keywordCount > 0
+    ? sortedKeywords.reduce(
+        (sum, keyword) => sum + (competitionValues[keyword?.competition] || 2),
+        0
+      ) / keywordCount
+    : 2;
+
+  const avgCompetition = avgCompetitionValue < 1.5 ? 'low' : avgCompetitionValue < 2.5 ? 'medium' : 'high';
+
+  const volumeScore = Math.min(60, Math.log(avgSearchVolume + 1) * 15);
+  const competitionScore = avgCompetitionValue * 12.5;
+  const sizeBonus = Math.min(15, keywordCount * 1.5);
+  const clusterValueScore = Math.round(Math.min(100, volumeScore + competitionScore + sizeBonus));
+
+  const recalculatedPillar = cluster.pillarTopic && cluster.pillarTopic.trim()
+    ? cluster.pillarTopic
+    : sortedKeywords[0]?.keyword || 'Unknown Topic';
+
+  return {
+    ...cluster,
+    pillarTopic: recalculatedPillar,
+    keywords: sortedKeywords,
+    keywordCount,
+    totalSearchVolume,
+    avgSearchVolume,
+    avgCompetition,
+    clusterValueScore,
+  };
+}
+
+function normalizeKeyword(keyword) {
+  return typeof keyword === 'string' ? keyword.trim().toLowerCase() : '';
+}
