@@ -35,14 +35,13 @@ keyword-research-tool/
 │   │   ├── gemini.js                 # Language-aware AI utilities
 │   │   ├── google-ads-python.js      # Google Ads metrics bridge
 │   │   └── scraper-unified.js
-│   ├── server.js                     # Default Express server (improved stack)
-│   └── server-improved.js            # Advanced server bootstrap (same stack)
+│   └── server.js                     # Express server (improved stack)
 ├── frontend/
 │   └── public/
 │       ├── index-improved.html       # Primary UI
 │       ├── app-improved.js           # Research workflow UI logic
-│       ├── index-simple.html         # Lightweight fallback UI
-│       └── app.js                    # Legacy simple UI script
+│       ├── index-simple.html         # Legacy fallback UI (not part of setup)
+│       └── app.js                    # Legacy simple UI script (not part of setup)
 ├── python-ads-service/               # Python helper (optional deployment)
 ├── tests/                            # Remaining scraper/exporter coverage
 ├── utils/                            # Language utilities and demo data
@@ -56,7 +55,6 @@ keyword-research-tool/
 ```bash
 npm install
 npm start
-# or: USE_IMPROVED_API=true npm run start:improved
 ```
 
 The app is served at [http://localhost:3000](http://localhost:3000). Provide Google Ads and Gemini credentials through environment variables for production-grade data.

@@ -73,7 +73,7 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 
    **Terminal 2 - Node.js server (port 3000):**
    ```bash
-   npm run start:improved
+   npm start
    ```
 
 7. **Open your browser**
@@ -123,8 +123,7 @@ keyword-research-tool/
 │   │   └── exporter.js              # CSV/JSON export
 │   ├── utils/
 │   │   └── demo-data.js             # Demo/fallback data
-│   ├── server.js                    # Express server (improved stack)
-│   └── server-improved.js           # Advanced bootstrap
+│   └── server.js                    # Express server (improved stack)
 ├── python-ads-service/              # Python microservice (Google Ads API v21)
 │   ├── app.py                       # Flask service
 │   ├── requirements.txt             # Python dependencies
@@ -133,8 +132,8 @@ keyword-research-tool/
 │   └── public/
 │       ├── index-improved.html      # Primary UI
 │       ├── app-improved.js          # Frontend logic
-│       ├── index-simple.html        # Legacy simple UI
-│       └── app.js                   # Legacy script
+│       ├── index-simple.html        # Legacy simple UI (not used by default)
+│       └── app.js                   # Legacy script (not used by default)
 ├── tests/
 │   ├── exporter.test.js
 │   └── scraper.test.js
