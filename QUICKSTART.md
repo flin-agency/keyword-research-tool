@@ -1,82 +1,43 @@
-# Quick Start Guide
+# Quick Start
 
-Get up and running in 60 seconds!
+Follow these steps to spin up the backend API and frontend UI.
 
-## 1. Start the Server
+## 1. Prerequisites
+
+- Node.js 16+
+- Python 3.8+
+- (Optional) Google Ads and Gemini credentials if you want live enrichment
+
+## 2. Install
 
 ```bash
-npm start
+git clone https://github.com/flin-agency/keyword-research-tool.git
+cd keyword-research-tool
+npm install
+cd python-ads-service && pip3 install -r requirements.txt && cd ..
+npx playwright install
 ```
 
-You should see:
-```
-Server running on port 3000
-```
+## 3. Configure (once)
 
-## 2. Open the Web Interface
-
-Open your browser to: **http://localhost:3000**
-
-## 3. Try It Out
-
-1. Enter a website URL in the input field:
-   - `github.com`
-   - `stackoverflow.com`
-   - `reddit.com`
-   - Any website you want to analyze
-
-2. Click **"Start Research"**
-
-3. Watch the progress bar as it:
-   - Scans the website (0-40%)
-   - Extracts keywords (40-50%)
-   - Queries keyword data (50-80%)
-   - Builds topic clusters (80-100%)
-
-4. View your results:
-   - Summary statistics at the top
-   - Topic clusters ranked by value
-   - Click cluster headers to expand/collapse
-   - Keywords with search volume, competition, and CPC
-
-5. Export results:
-   - Click **"Export CSV"** for spreadsheet
-   - Click **"Export JSON"** for raw data
-
-## Expected Results
-
-- **Total Keywords**: 200-500
-- **Topic Clusters**: 5-15
-- **Processing Time**: 1-2 minutes
-
-## Note About Google Ads API
-
-This tool works **without** Google Ads API credentials by using realistic mock data.
-
-To use real Google Ads data:
-1. Set up Google Ads API credentials (see README.md)
-2. Add credentials to `.env` file
-3. Restart the server
-
-## Troubleshooting
-
-### Server won't start
 ```bash
-# Kill any process using port 3000
-lsof -ti:3000 | xargs kill -9
-
-# Try again
-npm start
+cp .env.example .env
+cp python-ads-service/.env.example python-ads-service/.env
 ```
 
-### Website scraping fails
-- Try a different website
-- Some websites block automated scraping
-- The tool will still work, it just needs an accessible website
+Populate credentials in the copied files when you have them. The app still runs with demo data if you leave the defaults.
 
-### Need help?
-Check the full **README.md** for detailed documentation.
+## 4. Start the services
 
----
+Open two terminals:
 
-**That's it! You're ready to discover keyword opportunities.** 🚀
+```bash
+# Terminal A – Python Google Ads microservice
+cd python-ads-service
+python3 app.py  # listens on port 5001 by default
+
+# Terminal B – Node.js backend + frontend
+npm run start:improved  # serves the API and UI on http://localhost:3000
+```
+
+That’s it—visit **http://localhost:3000** to use the tool.
