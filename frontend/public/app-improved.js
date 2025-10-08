@@ -8,6 +8,8 @@ const elements = {
   countrySelect: document.getElementById('countrySelect'),
   languageSelect: document.getElementById('languageSelect'),
   startBtn: document.getElementById('startBtn'),
+  maxPagesInput: document.getElementById('maxPagesInput'),
+  followLinksCheckbox: document.getElementById('followLinksCheckbox'),
   progressContainer: document.getElementById('progressContainer'),
   progressFill: document.getElementById('progressFill'),
   progressText: document.getElementById('progressText'),
@@ -26,11 +28,33 @@ function getSelectedLanguageLabel() {
   return option?.dataset?.label || option?.textContent || '';
 }
 
+function getCrawlOptions() {
+  const options = {};
+
+  if (elements.maxPagesInput) {
+    const parsed = parseInt(elements.maxPagesInput.value, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      const clamped = Math.min(parsed, 100);
+      options.maxPages = clamped;
+      if (clamped !== parsed) {
+        elements.maxPagesInput.value = clamped;
+      }
+    }
+  }
+
+  if (elements.followLinksCheckbox) {
+    options.followLinks = elements.followLinksCheckbox.checked;
+  }
+
+  return options;
+}
+
 async function startResearch() {
   const url = elements.urlInput.value.trim();
   const country = elements.countrySelect.value;
   const language = elements.languageSelect.value;
   const languageLabel = getSelectedLanguageLabel();
+  const options = getCrawlOptions();
 
   if (!url) {
     showError('Please enter a website URL');
@@ -49,7 +73,7 @@ async function startResearch() {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ url, country, language, languageLabel }),
+      body: JSON.stringify({ url, country, language, languageLabel, options }),
     });
 
     if (!response.ok) {
