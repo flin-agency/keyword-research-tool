@@ -12,6 +12,15 @@ const MIN_CLUSTER_SIZE = 3;
 const MAX_CLUSTERS = 20;
 const MIN_CLUSTERS = 3;
 
+const STOP_WORDS = new Set([
+  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'your', 'when', 'what',
+  'best', 'how', 'are', 'was', 'you', 'why', 'can', 'will', 'use', 'using',
+  'into', 'have', 'has', 'had', 'their', 'them', 'they', 'about', 'want', 'need',
+  'idea', 'ideas', 'tips', 'guide', 'guides', 'info', 'information', 'to', 'in',
+  'on', 'of', 'a', 'an', 'is', 'it', 'be', 'by', 'or', 'as'
+]);
+const STEMMED_STOP_WORDS = new Set([...STOP_WORDS].map(word => stemmer.stem(word)));
+
 /**
  * Enhanced clustering with multiple algorithms and semantic similarity
  */
@@ -75,7 +84,12 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
     if (clusters.length < MIN_CLUSTERS && keywordData.length > 20) {
       console.log('[Clustering] Too few clusters, adjusting parameters...');
       clusters = await clusterWithKMeans(keywordData, { forceNumClusters: MIN_CLUSTERS });
+      clusters = clusters.filter(c => c.keywords.length >= minClusterSize);
     }
+
+    // Ensure clusters are semantically distinct before scoring
+    clusters = enforceDistinctTopics(clusters);
+    clusters = clusters.filter(c => c.keywords.length >= minClusterSize);
 
     // Sort clusters by value score
     clusters = sortAndRankClusters(clusters);
@@ -626,6 +640,172 @@ function calculateClusterSimilarity(cluster1, cluster2) {
   }
 
   return (topicSimilarity * 0.4) + (keywordSimilarity * 0.6);
+}
+
+/**
+ * Ensure clusters cover distinct intents and do not share semantically overlapping keywords
+ */
+function enforceDistinctTopics(clusters) {
+  if (!Array.isArray(clusters) || clusters.length <= 1) {
+    return clusters;
+  }
+
+  const workingClusters = clusters.map(cluster => ({
+    ...cluster,
+    keywords: [...cluster.keywords],
+  }));
+
+  const removedIndexes = new Set();
+
+  for (let i = 0; i < workingClusters.length; i++) {
+    if (removedIndexes.has(i)) continue;
+
+    for (let j = i + 1; j < workingClusters.length; j++) {
+      if (removedIndexes.has(j)) continue;
+
+      const similarity = calculateClusterSimilarity(workingClusters[i], workingClusters[j]);
+      const intentOverlap = calculateIntentOverlap(workingClusters[i], workingClusters[j]);
+
+      if (similarity > 0.65 || intentOverlap > 0.55) {
+        const targetIndex = workingClusters[i].totalSearchVolume >= workingClusters[j].totalSearchVolume ? i : j;
+        const sourceIndex = targetIndex === i ? j : i;
+
+        const targetCluster = workingClusters[targetIndex];
+        const sourceCluster = workingClusters[sourceIndex];
+
+        const existingKeywords = new Map();
+        targetCluster.keywords.forEach(keyword => {
+          existingKeywords.set(keyword.keyword.toLowerCase(), keyword);
+        });
+
+        sourceCluster.keywords.forEach(keyword => {
+          const normalized = keyword.keyword.toLowerCase();
+          if (!existingKeywords.has(normalized)) {
+            targetCluster.keywords.push(keyword);
+            existingKeywords.set(normalized, keyword);
+          } else {
+            const existingKeyword = existingKeywords.get(normalized);
+            const existingScore = calculateSemanticSimilarity(existingKeyword.keyword, targetCluster.pillarTopic);
+            const candidateScore = calculateSemanticSimilarity(keyword.keyword, targetCluster.pillarTopic);
+            if (candidateScore > existingScore + 0.05) {
+              const indexToReplace = targetCluster.keywords.findIndex(
+                k => k.keyword.toLowerCase() === normalized
+              );
+              if (indexToReplace !== -1) {
+                targetCluster.keywords[indexToReplace] = keyword;
+                existingKeywords.set(normalized, keyword);
+              }
+            }
+          }
+        });
+
+        removedIndexes.add(sourceIndex);
+      }
+    }
+  }
+
+  const keywordOwners = new Map();
+  const dedupedClusters = [];
+
+  workingClusters.forEach((cluster, index) => {
+    if (removedIndexes.has(index)) return;
+
+    const uniqueKeywords = [];
+
+    cluster.keywords.forEach(keyword => {
+      const normalized = keyword.keyword.toLowerCase();
+      const candidateScore = calculateSemanticSimilarity(keyword.keyword, cluster.pillarTopic);
+
+      if (!keywordOwners.has(normalized)) {
+        keywordOwners.set(normalized, { index: dedupedClusters.length, score: candidateScore });
+        uniqueKeywords.push(keyword);
+        return;
+      }
+
+      const owner = keywordOwners.get(normalized);
+      const existingCluster = dedupedClusters[owner.index];
+
+      if (!existingCluster) {
+        keywordOwners.set(normalized, { index: dedupedClusters.length, score: candidateScore });
+        uniqueKeywords.push(keyword);
+        return;
+      }
+
+      if (candidateScore > owner.score + 0.05) {
+        existingCluster.keywords = existingCluster.keywords.filter(
+          existingKeyword => existingKeyword.keyword.toLowerCase() !== normalized
+        );
+        keywordOwners.set(normalized, { index: dedupedClusters.length, score: candidateScore });
+        uniqueKeywords.push(keyword);
+      }
+    });
+
+    if (uniqueKeywords.length >= MIN_CLUSTER_SIZE) {
+      dedupedClusters.push({
+        ...cluster,
+        keywords: uniqueKeywords,
+      });
+    }
+  });
+
+  const cleanedClusters = [];
+  const orphanKeywords = [];
+
+  dedupedClusters.forEach(cluster => {
+    if (cluster.keywords.length >= MIN_CLUSTER_SIZE) {
+      cleanedClusters.push(cluster);
+    } else {
+      orphanKeywords.push(...cluster.keywords);
+    }
+  });
+
+  if (orphanKeywords.length > 0 && cleanedClusters.length > 0) {
+    orphanKeywords.forEach(keyword => {
+      const bestCluster = findBestClusterForKeyword(keyword, cleanedClusters);
+      if (bestCluster && !bestCluster.keywords.some(k => k.keyword === keyword.keyword)) {
+        bestCluster.keywords.push(keyword);
+      }
+    });
+  }
+
+  return cleanedClusters.map((cluster, idx) =>
+    createClusterObject(idx + 1, cluster.keywords, cluster.algorithm || 'hybrid-dedup')
+  );
+}
+
+/**
+ * Calculate overlap of intent-defining tokens between clusters
+ */
+function calculateIntentOverlap(cluster1, cluster2) {
+  const tokens1 = collectIntentTokens(cluster1);
+  const tokens2 = collectIntentTokens(cluster2);
+
+  if (tokens1.size === 0 || tokens2.size === 0) {
+    return 0;
+  }
+
+  const intersection = [...tokens1].filter(token => tokens2.has(token));
+  const union = new Set([...tokens1, ...tokens2]);
+
+  return intersection.length / union.size;
+}
+
+function collectIntentTokens(cluster) {
+  const tokens = new Set();
+
+  extractIntentTokens(cluster.pillarTopic).forEach(token => tokens.add(token));
+  cluster.keywords.slice(0, 5).forEach(keyword => {
+    extractIntentTokens(keyword.keyword).forEach(token => tokens.add(token));
+  });
+
+  return tokens;
+}
+
+function extractIntentTokens(text) {
+  return tokenizer
+    .tokenize(text.toLowerCase())
+    .map(token => stemmer.stem(token))
+    .filter(token => token.length > 2 && !STEMMED_STOP_WORDS.has(token));
 }
 
 /**
