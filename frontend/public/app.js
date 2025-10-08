@@ -2,6 +2,29 @@ const API_URL = 'http://localhost:3000/api';
 
 let currentJobId = null;
 
+function getCrawlOptions() {
+  const options = {};
+
+  const maxPagesInput = document.getElementById('maxPagesInput');
+  if (maxPagesInput) {
+    const parsed = parseInt(maxPagesInput.value, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      const clamped = Math.min(parsed, 100);
+      options.maxPages = clamped;
+      if (clamped !== parsed) {
+        maxPagesInput.value = clamped;
+      }
+    }
+  }
+
+  const followLinksCheckbox = document.getElementById('followLinksCheckbox');
+  if (followLinksCheckbox) {
+    options.followLinks = followLinksCheckbox.checked;
+  }
+
+  return options;
+}
+
 // Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', () => {
   const startBtn = document.getElementById('startBtn');
@@ -25,6 +48,7 @@ async function startResearch() {
   const languageSelect = document.getElementById('languageSelect');
   const language = languageSelect.value;
   const languageLabel = languageSelect.options[languageSelect.selectedIndex]?.dataset?.label || '';
+  const options = getCrawlOptions();
 
   if (!url) {
     showError('Please enter a URL');
@@ -39,7 +63,7 @@ async function startResearch() {
 
   try {
     // Start research job
-    const payload = { url, country, language, languageLabel };
+    const payload = { url, country, language, languageLabel, options };
 
     const response = await fetch(`${API_URL}/research`, {
       method: 'POST',
