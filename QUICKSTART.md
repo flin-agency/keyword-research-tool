@@ -37,7 +37,13 @@ cd python-ads-service
 python3 app.py  # listens on port 5001 by default
 
 # Terminal B – Node.js backend + frontend
-npm run start:improved  # serves the API and UI on http://localhost:3000
+# macOS/Linux
+npx cross-env USE_IMPROVED_API=true node backend/server-improved.js
+
+# Windows (PowerShell or Command Prompt)
+npm run start:improved
+
+# Both commands start the API and UI at http://localhost:3000
 ```
 
 That’s it—visit **http://localhost:3000** to use the tool.
