@@ -1,6 +1,8 @@
 const state = {
   currentJobId: null,
   pollInterval: null,
+  googleAuthStatus: null,
+  apiInfo: null,
 };
 
 const elements = {
@@ -19,6 +21,13 @@ const elements = {
   clusters: document.getElementById('clusters'),
   exportCsv: document.getElementById('exportCsv'),
   exportJson: document.getElementById('exportJson'),
+  apiWarning: document.getElementById('apiWarning'),
+  googleStatusBadge: document.getElementById('googleStatusBadge'),
+  googleStatusHint: document.getElementById('googleStatusHint'),
+  connectGoogleBtn: document.getElementById('connectGoogleBtn'),
+  refreshStatusBtn: document.getElementById('refreshStatusBtn'),
+  manualRefreshForm: document.getElementById('manualRefreshForm'),
+  manualRefreshInput: document.getElementById('manualRefreshInput'),
 };
 
 function getSelectedLanguageLabel() {
@@ -47,6 +56,236 @@ function getCrawlOptions() {
   }
 
   return options;
+}
+
+function safeDecode(value) {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  try {
+    return decodeURIComponent(value.replace(/\+/g, ' '));
+  } catch (error) {
+    console.warn('Failed to decode parameter', value, error);
+    return value;
+  }
+}
+
+function handleRedirectMessages() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params || params.size === 0) {
+    return;
+  }
+
+  const success = params.get('success');
+  const error = params.get('error');
+  const messageParam = params.get('message');
+
+  if (success === 'true') {
+    const message = messageParam ? safeDecode(messageParam) : 'Google account connected successfully.';
+    showSuccess(message);
+  } else if (error) {
+    const message = safeDecode(error);
+    showError(message || 'Google OAuth failed.');
+  }
+
+  if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+
+async function loadIntegrationStatus(showMessages = false) {
+  if (!elements.googleStatusBadge) {
+    return null;
+  }
+
+  try {
+    const response = await fetch('/api/auth/status', { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error('Failed to load Google OAuth status');
+    }
+
+    const status = await response.json();
+    state.googleAuthStatus = status;
+    updateGoogleStatusDisplay(status);
+    updateApiWarning();
+
+    if (showMessages) {
+      showSuccess('Integration status refreshed.');
+    }
+
+    return status;
+  } catch (error) {
+    console.error('Failed to load Google OAuth status:', error);
+    state.googleAuthStatus = { error: error.message };
+    updateGoogleStatusDisplay(state.googleAuthStatus);
+    updateApiWarning();
+
+    if (showMessages) {
+      showError(`Failed to refresh integration status. ${error.message}`);
+    }
+
+    return null;
+  }
+}
+
+async function loadApiInfo() {
+  try {
+    const response = await fetch('/api/info', { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error('Failed to load API information');
+    }
+
+    const info = await response.json();
+    state.apiInfo = info;
+    updateApiWarning();
+    return info;
+  } catch (error) {
+    console.error('Failed to load API info:', error);
+    state.apiInfo = { error: error.message };
+    updateApiWarning();
+    return null;
+  }
+}
+
+function updateGoogleActions(status) {
+  const { connectGoogleBtn } = elements;
+  if (!connectGoogleBtn) {
+    return;
+  }
+
+  if (!status || status.error) {
+    connectGoogleBtn.disabled = true;
+    connectGoogleBtn.title = status?.error ? status.error : 'Unable to verify Google OAuth status.';
+    connectGoogleBtn.textContent = 'Connect Google Account';
+    return;
+  }
+
+  const missingClientConfig = !status.hasClientId || !status.hasClientSecret;
+  connectGoogleBtn.disabled = missingClientConfig;
+  connectGoogleBtn.title = missingClientConfig
+    ? 'Add GOOGLE_ADS_CLIENT_ID and GOOGLE_ADS_CLIENT_SECRET to your .env file to enable OAuth.'
+    : '';
+  connectGoogleBtn.textContent = status.configured ? 'Reconnect Google Account' : 'Connect Google Account';
+}
+
+function updateGoogleStatusDisplay(status) {
+  const { googleStatusBadge, googleStatusHint } = elements;
+  if (!googleStatusBadge || !googleStatusHint) {
+    return;
+  }
+
+  let badgeClass = 'status-indicator--unknown';
+  let badgeText = 'Status unavailable';
+  let hintText = 'Unable to verify Google Ads OAuth status.';
+
+  if (status && !status.error) {
+    if (!status.hasClientId || !status.hasClientSecret) {
+      badgeClass = 'status-indicator--warning';
+      badgeText = 'Client credentials required';
+      hintText = 'Add your Google Ads OAuth client ID and secret to the server environment.';
+    } else if (status.configured) {
+      badgeClass = 'status-indicator--connected';
+      badgeText = 'Connected';
+      hintText = 'Refresh token stored. You can reconnect to rotate credentials at any time.';
+    } else {
+      badgeClass = 'status-indicator--disconnected';
+      badgeText = 'Action required';
+      hintText = 'Click connect or paste an existing refresh token to enable Google Ads metrics.';
+    }
+  } else if (status?.error) {
+    badgeClass = 'status-indicator--unknown';
+    badgeText = 'Status unavailable';
+    hintText = `Failed to load status: ${status.error}`;
+  }
+
+  googleStatusBadge.className = `status-indicator ${badgeClass}`;
+  googleStatusBadge.textContent = badgeText;
+  googleStatusHint.textContent = hintText;
+
+  updateGoogleActions(status);
+}
+
+function updateApiWarning() {
+  const { apiWarning } = elements;
+  if (!apiWarning) {
+    return;
+  }
+
+  if (state.googleAuthStatus === null || state.apiInfo === null) {
+    return;
+  }
+
+  const missingItems = [];
+
+  if (state.googleAuthStatus) {
+    if (state.googleAuthStatus.error) {
+      missingItems.push('Google Ads OAuth status (server error)');
+    } else if (!state.googleAuthStatus.hasClientId || !state.googleAuthStatus.hasClientSecret) {
+      missingItems.push('Google Ads OAuth client ID/secret');
+    } else if (!state.googleAuthStatus.configured) {
+      missingItems.push('Google Ads refresh token');
+    }
+  }
+
+  if (state.apiInfo) {
+    if (state.apiInfo.error) {
+      missingItems.push('Gemini API status (server error)');
+    } else if (!state.apiInfo.features?.aiKeywordExtraction) {
+      missingItems.push('Gemini API key');
+    }
+  }
+
+  if (missingItems.length === 0) {
+    apiWarning.classList.remove('visible');
+    apiWarning.style.display = 'none';
+  } else {
+    apiWarning.textContent = `⚠️ ${missingItems.join(' and ')} required for live data.`;
+    apiWarning.classList.add('visible');
+    apiWarning.style.display = 'block';
+  }
+}
+
+async function handleManualRefreshSubmit(event) {
+  event.preventDefault();
+
+  if (!elements.manualRefreshInput) {
+    return;
+  }
+
+  const refreshToken = elements.manualRefreshInput.value.trim();
+
+  if (!refreshToken) {
+    showError('Please paste a refresh token before saving.');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/refresh-token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok || payload.success === false) {
+      throw new Error(payload.error || payload.message || 'Failed to update refresh token');
+    }
+
+    elements.manualRefreshInput.value = '';
+    showSuccess(payload.message || 'Refresh token saved successfully.');
+    await loadIntegrationStatus();
+  } catch (error) {
+    console.error('Failed to update refresh token:', error);
+    showError(error.message || 'Failed to update refresh token.');
+  }
+}
+
+async function initializeIntegrations() {
+  await Promise.all([loadIntegrationStatus(), loadApiInfo()]);
 }
 
 async function startResearch() {
@@ -233,6 +472,11 @@ async function exportResults(format) {
   }
 }
 
+function showSuccess(message) {
+  if (!elements.messageContainer) return;
+  elements.messageContainer.innerHTML = `<div class="success">${message}</div>`;
+}
+
 function showError(message) {
   if (!elements.messageContainer) return;
   elements.messageContainer.innerHTML = `<div class="error">${message}</div>`;
@@ -272,7 +516,26 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.exportJson.addEventListener('click', () => exportResults('json'));
   }
 
+  if (elements.connectGoogleBtn) {
+    elements.connectGoogleBtn.disabled = true;
+    elements.connectGoogleBtn.addEventListener('click', () => {
+      window.location.href = '/api/auth/google';
+    });
+  }
+
+  if (elements.refreshStatusBtn) {
+    elements.refreshStatusBtn.addEventListener('click', () => {
+      loadIntegrationStatus(true);
+    });
+  }
+
+  if (elements.manualRefreshForm) {
+    elements.manualRefreshForm.addEventListener('submit', handleManualRefreshSubmit);
+  }
+
   updateProgress(0, 'Ready');
+  handleRedirectMessages();
+  initializeIntegrations();
 });
 
 window.toggleCluster = toggleCluster;

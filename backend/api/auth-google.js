@@ -6,10 +6,14 @@ const path = require('path');
 const router = express.Router();
 
 // OAuth2 Configuration
+const port = process.env.PORT || 3000;
+const baseUrl = (process.env.APP_BASE_URL || `http://localhost:${port}`).replace(/\/$/, '');
+const redirectUri = (process.env.GOOGLE_ADS_REDIRECT_URI || `${baseUrl}/api/auth/google/callback`).replace(/\/$/, '');
+
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_ADS_CLIENT_ID,
   process.env.GOOGLE_ADS_CLIENT_SECRET,
-  'http://localhost:3000/api/auth/google/callback'
+  redirectUri
 );
 
 // Scopes needed for Google Ads API

@@ -36,6 +36,9 @@ GOOGLE_ADS_CLIENT_ID=your_client_id_here.apps.googleusercontent.com
 GOOGLE_ADS_CLIENT_SECRET=your_client_secret_here
 GOOGLE_ADS_DEVELOPER_TOKEN=your_developer_token_here
 GOOGLE_ADS_LOGIN_CUSTOMER_ID=your_manager_account_id
+# Optional: override defaults when running behind a proxy or in production
+APP_BASE_URL=https://your-app.example.com
+GOOGLE_ADS_REDIRECT_URI=https://your-app.example.com/api/auth/google/callback
 ```
 
 **Note:** Leave `GOOGLE_ADS_REFRESH_TOKEN` empty - it will be generated automatically!
@@ -44,7 +47,7 @@ GOOGLE_ADS_LOGIN_CUSTOMER_ID=your_manager_account_id
 
 1. Start the server: `npm start`
 2. Open http://localhost:3000 in your browser
-3. Click the **"Connect Google Account"** button
+3. Click the **"Connect Google Account"** button in the Integrations panel
 4. Sign in with your Google account
 5. Grant permissions when prompted
 6. You'll be redirected back to the app with a success message
@@ -69,4 +72,4 @@ The refresh token is now automatically saved to your `.env` file!
 
 For production, update the redirect URI in:
 1. Google Cloud Console credentials
-2. `backend/api/auth-google.js` - change the redirect URI to your production URL
+2. `.env` via `APP_BASE_URL` or `GOOGLE_ADS_REDIRECT_URI`
