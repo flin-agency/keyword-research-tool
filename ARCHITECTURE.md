@@ -397,7 +397,7 @@ Continue processing
 ### Current Status
 - Legacy Jest suites covering the deprecated pipeline have been removed.
 - Remaining automated tests: `scraper.test.js`, `exporter.test.js`.
-- New integration tests should target `research-improved`, `clustering-improved`, and Gemini-assisted flows.
+- New integration tests should target `research`, `clustering-improved`, and Gemini-assisted flows.
 
 ### Recommended Test Types
 - **Unit Tests**: Language utilities, Gemini prompt builders, clustering helpers.

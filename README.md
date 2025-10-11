@@ -73,7 +73,7 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 
    **Terminal 2 - Node.js server (port 3000):**
    ```bash
-   npm run start:improved
+   npm start
    ```
 
 7. **Open your browser**
@@ -114,7 +114,7 @@ keyword-research-tool/
 │   ├── api/
 │   │   ├── auth-google.js
 │   │   ├── refresh-token.js
-│   │   └── research-improved.js     # Main API endpoints
+│   │   └── research.js             # Main API endpoints
 │   ├── services/
 │   │   ├── scraper-unified.js       # Multi-strategy web scraping
 │   │   ├── google-ads-python.js     # Python microservice client
@@ -123,18 +123,15 @@ keyword-research-tool/
 │   │   └── exporter.js              # CSV/JSON export
 │   ├── utils/
 │   │   └── demo-data.js             # Demo/fallback data
-│   ├── server.js                    # Express server (improved stack)
-│   └── server-improved.js           # Advanced bootstrap
+│   └── server.js                    # Express server (improved stack)
 ├── python-ads-service/              # Python microservice (Google Ads API v21)
 │   ├── app.py                       # Flask service
 │   ├── requirements.txt             # Python dependencies
 │   └── .env.example                 # Python service env template
 ├── frontend/
 │   └── public/
-│       ├── index-improved.html      # Primary UI
-│       ├── app-improved.js          # Frontend logic
-│       ├── index-simple.html        # Legacy simple UI
-│       └── app.js                   # Legacy script
+│       ├── index.html               # Unified UI
+│       └── app.js                   # Frontend logic
 ├── tests/
 │   ├── exporter.test.js
 │   └── scraper.test.js

@@ -42,7 +42,7 @@ GOOGLE_ADS_LOGIN_CUSTOMER_ID=your_manager_account_id
 
 ## Step 4: Connect Your Google Account
 
-1. Start the server: `npm run start:improved`
+1. Start the server: `npm start`
 2. Open http://localhost:3000 in your browser
 3. Click the **"Connect Google Account"** button
 4. Sign in with your Google account

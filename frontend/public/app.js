@@ -1,237 +1,278 @@
-const API_URL = 'http://localhost:3000/api';
+const state = {
+  currentJobId: null,
+  pollInterval: null,
+};
 
-let currentJobId = null;
+const elements = {
+  urlInput: document.getElementById('urlInput'),
+  countrySelect: document.getElementById('countrySelect'),
+  languageSelect: document.getElementById('languageSelect'),
+  startBtn: document.getElementById('startBtn'),
+  maxPagesInput: document.getElementById('maxPagesInput'),
+  followLinksCheckbox: document.getElementById('followLinksCheckbox'),
+  progressContainer: document.getElementById('progressContainer'),
+  progressFill: document.getElementById('progressFill'),
+  progressText: document.getElementById('progressText'),
+  messageContainer: document.getElementById('messageContainer'),
+  results: document.getElementById('results'),
+  summary: document.getElementById('summary'),
+  clusters: document.getElementById('clusters'),
+  exportCsv: document.getElementById('exportCsv'),
+  exportJson: document.getElementById('exportJson'),
+};
+
+function getSelectedLanguageLabel() {
+  const { languageSelect } = elements;
+  if (!languageSelect) return '';
+  const option = languageSelect.options[languageSelect.selectedIndex];
+  return option?.dataset?.label || option?.textContent || '';
+}
 
 function getCrawlOptions() {
   const options = {};
 
-  const maxPagesInput = document.getElementById('maxPagesInput');
-  if (maxPagesInput) {
-    const parsed = parseInt(maxPagesInput.value, 10);
+  if (elements.maxPagesInput) {
+    const parsed = parseInt(elements.maxPagesInput.value, 10);
     if (Number.isFinite(parsed) && parsed > 0) {
       const clamped = Math.min(parsed, 100);
       options.maxPages = clamped;
       if (clamped !== parsed) {
-        maxPagesInput.value = clamped;
+        elements.maxPagesInput.value = clamped;
       }
     }
   }
 
-  const followLinksCheckbox = document.getElementById('followLinksCheckbox');
-  if (followLinksCheckbox) {
-    options.followLinks = followLinksCheckbox.checked;
+  if (elements.followLinksCheckbox) {
+    options.followLinks = elements.followLinksCheckbox.checked;
   }
 
   return options;
 }
 
-// Wait for DOM to be ready
-document.addEventListener('DOMContentLoaded', () => {
-  const startBtn = document.getElementById('startBtn');
-  const exportCsv = document.getElementById('exportCsv');
-  const exportJson = document.getElementById('exportJson');
-
-  if (startBtn) {
-    startBtn.addEventListener('click', startResearch);
-  }
-  if (exportCsv) {
-    exportCsv.addEventListener('click', () => exportResults('csv'));
-  }
-  if (exportJson) {
-    exportJson.addEventListener('click', () => exportResults('json'));
-  }
-});
-
 async function startResearch() {
-  const url = document.getElementById('urlInput').value.trim();
-  const country = document.getElementById('countrySelect').value;
-  const languageSelect = document.getElementById('languageSelect');
-  const language = languageSelect.value;
-  const languageLabel = languageSelect.options[languageSelect.selectedIndex]?.dataset?.label || '';
+  const url = elements.urlInput.value.trim();
+  const country = elements.countrySelect.value;
+  const language = elements.languageSelect.value;
+  const languageLabel = getSelectedLanguageLabel();
   const options = getCrawlOptions();
 
   if (!url) {
-    showError('Please enter a URL');
+    showError('Please enter a website URL');
     return;
   }
 
-  // Reset UI
-  document.getElementById('results').style.display = 'none';
-  document.getElementById('errorContainer').innerHTML = '';
-  document.getElementById('progressContainer').style.display = 'block';
-  document.getElementById('startBtn').disabled = true;
+  resetMessages();
+  elements.results.style.display = 'none';
+  elements.progressContainer.style.display = 'block';
+  elements.startBtn.disabled = true;
+  updateProgress(5, 'Starting research...');
 
   try {
-    // Start research job
-    const payload = { url, country, language, languageLabel, options };
-
-    const response = await fetch(`${API_URL}/research`, {
+    const response = await fetch('/api/research', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url, country, language, languageLabel, options }),
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json().catch(() => ({}));
       throw new Error(error.error || 'Failed to start research');
     }
 
-    const data = await response.json();
-    currentJobId = data.job_id;
+    const { job_id: jobId } = await response.json();
+    state.currentJobId = jobId;
 
-    // Poll for results
-    pollJobStatus(currentJobId);
+    if (state.pollInterval) {
+      clearInterval(state.pollInterval);
+    }
+
+    state.pollInterval = setInterval(() => pollJobStatus(jobId), 2000);
   } catch (error) {
     showError(error.message);
-    document.getElementById('progressContainer').style.display = 'none';
-    document.getElementById('startBtn').disabled = false;
+    resetUI();
   }
 }
 
 async function pollJobStatus(jobId) {
   try {
-    const response = await fetch(`${API_URL}/research/${jobId}`);
-    const job = await response.json();
+    const response = await fetch(`/api/research/${jobId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch job status');
+    }
 
-    // Update progress
-    updateProgress(job.progress, job.step);
+    const job = await response.json();
+    updateProgress(job.progress || 0, job.step || 'Processing...');
 
     if (job.status === 'completed') {
-      document.getElementById('progressContainer').style.display = 'none';
-      document.getElementById('startBtn').disabled = false;
+      clearInterval(state.pollInterval);
       displayResults(job.data);
+      resetUI();
+
+      (job.warnings || []).forEach((warning) => showWarning(warning));
     } else if (job.status === 'failed') {
-      throw new Error(job.error || 'Research failed');
-    } else {
-      // Continue polling
-      setTimeout(() => pollJobStatus(jobId), 2000);
+      clearInterval(state.pollInterval);
+      showError(job.error || 'Research failed');
+      resetUI();
     }
   } catch (error) {
+    clearInterval(state.pollInterval);
     showError(error.message);
-    document.getElementById('progressContainer').style.display = 'none';
-    document.getElementById('startBtn').disabled = false;
+    resetUI();
   }
 }
 
-function updateProgress(percent, step) {
-  const fill = document.getElementById('progressFill');
-  const text = document.getElementById('progressText');
-
-  fill.style.width = `${percent}%`;
-  fill.textContent = `${percent}%`;
-  text.textContent = step;
+function updateProgress(progress, step) {
+  elements.progressFill.style.width = `${progress}%`;
+  elements.progressFill.textContent = `${progress}%`;
+  elements.progressText.textContent = step;
 }
 
 function displayResults(data) {
-  document.getElementById('results').style.display = 'block';
+  if (!data) return;
 
-  // Display summary
-  const summary = document.getElementById('summary');
-  summary.innerHTML = `
+  elements.summary.innerHTML = `
     <div class="stat-card">
-      <div class="number">${data.totalKeywords}</div>
+      <div class="number">${data.totalKeywords?.toLocaleString() || 0}</div>
       <div class="label">Total Keywords</div>
     </div>
     <div class="stat-card">
-      <div class="number">${data.totalClusters}</div>
+      <div class="number">${data.totalClusters?.toLocaleString() || 0}</div>
       <div class="label">Topic Clusters</div>
     </div>
     <div class="stat-card">
-      <div class="number">${formatNumber(data.totalSearchVolume)}</div>
+      <div class="number">${data.totalSearchVolume?.toLocaleString() || 0}</div>
       <div class="label">Total Search Volume</div>
     </div>
     <div class="stat-card">
-      <div class="number">${data.scrapedContent.pages.length || data.scrapedContent.pages}</div>
-      <div class="label">Pages Scanned</div>
+      <div class="number">${data.country || 'N/A'}</div>
+      <div class="label">Target Market</div>
     </div>
   `;
 
-  // Display clusters
-  const clusters = document.getElementById('clusters');
-  clusters.innerHTML = data.clusters.map((cluster, index) => `
-    <div class="cluster">
+  elements.clusters.innerHTML = '';
+  (data.clusters || []).forEach((cluster, index) => {
+    const clusterDiv = document.createElement('div');
+    clusterDiv.className = 'cluster';
+    clusterDiv.innerHTML = `
       <div class="cluster-header" onclick="toggleCluster(${index})">
-        <div>
-          <div class="cluster-title">
-            ${index + 1}. ${cluster.pillarTopic}
-            ${cluster.aiEnhanced ? '<span style="background: linear-gradient(90deg, #667eea, #764ba2); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; margin-left: 8px;">✨ AI Enhanced</span>' : ''}
-            ${cluster.aiPriority ? '<span style="background: #ff6b6b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; margin-left: 8px;">🔥 Priority</span>' : ''}
-          </div>
-          ${cluster.aiDescription ? `<div style="color: #666; font-size: 0.9rem; margin-top: 5px; font-style: italic;">${cluster.aiDescription}</div>` : ''}
-          <div class="cluster-meta">
-            <span>📊 ${formatNumber(cluster.totalSearchVolume)} searches/mo</span>
-            <span>🎯 ${cluster.keywords.length} keywords</span>
-            <span>💎 Score: ${cluster.clusterValueScore.toFixed(1)}/100</span>
-          </div>
-          ${cluster.aiContentStrategy ? `<div style="background: #f0f7ff; padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 0.85rem;"><strong>📝 Content Strategy:</strong> ${cluster.aiContentStrategy}</div>` : ''}
-        </div>
-        <div class="cluster-badge">${cluster.avgCompetition.toUpperCase()}</div>
+        <div class="cluster-title">${cluster.pillarTopic}</div>
+        <div class="cluster-badge">${cluster.keywords?.length || 0} keywords</div>
       </div>
-      <table class="keywords-table" id="cluster-${index}">
-        <thead>
-          <tr>
-            <th>Keyword</th>
-            <th>Search Volume</th>
-            <th>Competition</th>
-            <th>CPC Range</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${cluster.keywords.slice(0, 10).map(kw => `
+      <div class="cluster-meta">
+        <span>📊 Volume: ${cluster.totalSearchVolume?.toLocaleString() || 0}</span>
+        <span>🎯 Competition: ${cluster.avgCompetition || 'N/A'}</span>
+        <span>💯 Score: ${cluster.clusterValueScore || 0}</span>
+      </div>
+      ${cluster.aiDescription ? `<div class="cluster-description">${cluster.aiDescription}</div>` : ''}
+      ${cluster.aiContentStrategy ? `<div class="cluster-strategy">✨ <strong>Content Strategy:</strong> ${cluster.aiContentStrategy}</div>` : ''}
+      <div id="cluster-${index}" class="cluster-details" style="display: none;">
+        <table class="keywords-table">
+          <thead>
             <tr>
-              <td>${kw.keyword}</td>
-              <td>${formatNumber(kw.searchVolume)}</td>
-              <td><span class="competition-badge competition-${kw.competition}">${kw.competition.toUpperCase()}</span></td>
-              <td>$${kw.cpc.toFixed(2)} - $${kw.cpcHigh.toFixed(2)}</td>
+              <th>Keyword</th>
+              <th>Search Volume</th>
+              <th>Competition</th>
+              <th>CPC</th>
             </tr>
-          `).join('')}
-          ${cluster.keywords.length > 10 ? `
-            <tr>
-              <td colspan="4" style="text-align: center; color: #666;">
-                + ${cluster.keywords.length - 10} more keywords
-              </td>
-            </tr>
-          ` : ''}
-        </tbody>
-      </table>
-    </div>
-  `).join('');
+          </thead>
+          <tbody>
+            ${(cluster.keywords || [])
+              .slice(0, 10)
+              .map(
+                (kw) => `
+              <tr>
+                <td>${kw.keyword}</td>
+                <td>${kw.searchVolume?.toLocaleString() || 0}</td>
+                <td><span class="competition-badge competition-${kw.competition}">${kw.competition}</span></td>
+                <td>$${kw.cpc?.toFixed(2) || '0.00'}</td>
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+        ${cluster.keywords?.length > 10 ? `<p style="margin-top: 10px; color: #666;">... and ${cluster.keywords.length - 10} more keywords</p>` : ''}
+      </div>
+    `;
+
+    elements.clusters.appendChild(clusterDiv);
+  });
+
+  elements.results.style.display = 'block';
 }
 
 function toggleCluster(index) {
-  const table = document.getElementById(`cluster-${index}`);
-  table.style.display = table.style.display === 'none' ? 'table' : 'none';
+  const content = document.getElementById(`cluster-${index}`);
+  if (content) {
+    content.style.display = content.style.display === 'none' ? 'block' : 'none';
+  }
 }
 
 async function exportResults(format) {
-  if (!currentJobId) return;
+  if (!state.currentJobId) return;
 
   try {
-    const response = await fetch(`${API_URL}/research/${currentJobId}/export?format=${format}`);
-
+    const response = await fetch(`/api/research/${state.currentJobId}/export?format=${format}`);
     if (!response.ok) {
-      throw new Error('Export failed');
+      throw new Error('Failed to export results');
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `keywords-${currentJobId}.${format}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `keywords-${state.currentJobId.slice(0, 8)}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
   } catch (error) {
     showError(error.message);
   }
 }
 
 function showError(message) {
-  const container = document.getElementById('errorContainer');
-  container.innerHTML = `<div class="error">${message}</div>`;
+  if (!elements.messageContainer) return;
+  elements.messageContainer.innerHTML = `<div class="error">${message}</div>`;
 }
 
-function formatNumber(num) {
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+function showWarning(message) {
+  if (!elements.messageContainer) return;
+  const warning = document.createElement('div');
+  warning.className = 'warning-banner visible';
+  warning.textContent = `⚠️ ${message}`;
+  warning.style.marginTop = '10px';
+  elements.messageContainer.appendChild(warning);
 }
+
+function resetMessages() {
+  if (elements.messageContainer) {
+    elements.messageContainer.innerHTML = '';
+  }
+}
+
+function resetUI() {
+  elements.startBtn.disabled = false;
+  elements.progressContainer.style.display = 'none';
+  updateProgress(0, 'Ready');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (elements.startBtn) {
+    elements.startBtn.addEventListener('click', startResearch);
+  }
+
+  if (elements.exportCsv) {
+    elements.exportCsv.addEventListener('click', () => exportResults('csv'));
+  }
+
+  if (elements.exportJson) {
+    elements.exportJson.addEventListener('click', () => exportResults('json'));
+  }
+
+  updateProgress(0, 'Ready');
+});
+
+window.toggleCluster = toggleCluster;
