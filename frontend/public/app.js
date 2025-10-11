@@ -432,14 +432,22 @@ async function exportResults(format) {
   }
 }
 
-function showSuccess(message) {
+function renderMessage(className, message) {
   if (!elements.messageContainer) return;
-  elements.messageContainer.innerHTML = `<div class="success">${message}</div>`;
+
+  elements.messageContainer.innerHTML = '';
+  const container = document.createElement('div');
+  container.className = className;
+  container.textContent = message;
+  elements.messageContainer.appendChild(container);
+}
+
+function showSuccess(message) {
+  renderMessage('success', message);
 }
 
 function showError(message) {
-  if (!elements.messageContainer) return;
-  elements.messageContainer.innerHTML = `<div class="error">${message}</div>`;
+  renderMessage('error', message);
 }
 
 function showWarning(message) {
