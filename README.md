@@ -114,7 +114,7 @@ keyword-research-tool/
 │   ├── api/
 │   │   ├── auth-google.js
 │   │   ├── refresh-token.js
-│   │   └── research-improved.js     # Main API endpoints
+│   │   └── research.js             # Main API endpoints
 │   ├── services/
 │   │   ├── scraper-unified.js       # Multi-strategy web scraping
 │   │   ├── google-ads-python.js     # Python microservice client

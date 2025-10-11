@@ -28,7 +28,7 @@ keyword-research-tool/
 │   ├── api/
 │   │   ├── auth-google.js
 │   │   ├── refresh-token.js
-│   │   └── research-improved.js      # Primary research API
+│   │   └── research.js              # Primary research API
 │   ├── services/
 │   │   ├── clustering-improved.js    # Hybrid clustering + Gemini enrichment
 │   │   ├── exporter.js

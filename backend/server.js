@@ -7,7 +7,7 @@ const path = require('path');
 dotenv.config();
 
 // Import routers
-const researchRouter = require('./api/research-improved');
+const researchRouter = require('./api/research');
 
 const refreshTokenRouter = require('./api/refresh-token');
 const authRouter = require('./api/auth-google');

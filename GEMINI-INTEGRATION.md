@@ -274,7 +274,7 @@ GEMINI_ENHANCE_LIMIT=5  # Default
    - Calls Gemini after ML clustering
    - Passes website context and language metadata
 
-3. **`backend/api/research-improved.js`** (MODIFIED)
+3. **`backend/api/research.js`** (MODIFIED)
    - Passes website context to clustering
    - Awaits clustering results and preserves language labels
 
