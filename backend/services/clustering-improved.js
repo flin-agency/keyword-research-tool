@@ -12,6 +12,15 @@ const MIN_CLUSTER_SIZE = 3;
 const MAX_CLUSTERS = 20;
 const MIN_CLUSTERS = 3;
 
+const STOP_WORDS = new Set([
+  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'your', 'when', 'what',
+  'best', 'how', 'are', 'was', 'you', 'why', 'can', 'will', 'use', 'using',
+  'into', 'have', 'has', 'had', 'their', 'them', 'they', 'about', 'want', 'need',
+  'idea', 'ideas', 'tips', 'guide', 'guides', 'info', 'information', 'to', 'in',
+  'on', 'of', 'a', 'an', 'is', 'it', 'be', 'by', 'or', 'as'
+]);
+const STEMMED_STOP_WORDS = new Set([...STOP_WORDS].map(word => stemmer.stem(word)));
+
 /**
  * Enhanced clustering with multiple algorithms and semantic similarity
  */
@@ -75,7 +84,12 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
     if (clusters.length < MIN_CLUSTERS && keywordData.length > 20) {
       console.log('[Clustering] Too few clusters, adjusting parameters...');
       clusters = await clusterWithKMeans(keywordData, { forceNumClusters: MIN_CLUSTERS });
+      clusters = clusters.filter(c => c.keywords.length >= minClusterSize);
     }
+
+    // Ensure each keyword only belongs to one cluster before AI review
+    clusters = ensureUniqueKeywords(clusters);
+    clusters = clusters.filter(c => c.keywords.length >= minClusterSize);
 
     // Sort clusters by value score
     clusters = sortAndRankClusters(clusters);
@@ -86,7 +100,20 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
         console.log(`[Clustering] Enhancing with Gemini AI in ${languageCode || 'en'}...`);
 
         // First, analyze and regroup
-        clusters = await gemini.analyzeAndRegroupClusters(clusters, websiteContext, keywordData, languageOptions);
+        clusters = await gemini.analyzeAndRegroupClusters(
+          clusters,
+          websiteContext,
+          keywordData,
+          languageOptions
+        );
+
+        // Let Gemini audit the topical boundaries and keyword placement
+        clusters = await gemini.scrutinizeClusterTopics(
+          clusters,
+          keywordData,
+          websiteContext,
+          languageOptions
+        );
 
         // Then enhance ALL clusters with detailed analysis
         console.log(`[Clustering] Enhancing all ${clusters.length} clusters with AI descriptions and content strategy...`);
@@ -114,7 +141,8 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
       }
     }
 
-    return clusters;
+    // Final safety pass to guarantee keyword uniqueness
+    return ensureUniqueKeywords(clusters);
 
   } catch (error) {
     console.error('[Clustering] Error:', error);
@@ -626,6 +654,79 @@ function calculateClusterSimilarity(cluster1, cluster2) {
   }
 
   return (topicSimilarity * 0.4) + (keywordSimilarity * 0.6);
+}
+
+/**
+ * Ensure clusters cover distinct intents and do not share semantically overlapping keywords
+ */
+function ensureUniqueKeywords(clusters) {
+  if (!Array.isArray(clusters) || clusters.length === 0) {
+    return [];
+  }
+
+  const normalizedClusters = clusters.map(cluster => ({
+    ...cluster,
+    keywords: [],
+  }));
+
+  const keywordOwners = new Map();
+
+  clusters.forEach((cluster, clusterIndex) => {
+    if (!cluster || !Array.isArray(cluster.keywords)) return;
+
+    cluster.keywords.forEach(keyword => {
+      if (!keyword || typeof keyword.keyword !== 'string') {
+        return;
+      }
+
+      const normalized = keyword.keyword.trim().toLowerCase();
+      if (!normalized) return;
+
+      const affinity = calculateSemanticSimilarity(keyword.keyword, cluster.pillarTopic || '');
+      const currentOwner = keywordOwners.get(normalized);
+
+      if (!currentOwner || affinity > currentOwner.affinity + 0.02) {
+        if (currentOwner) {
+          const ownerCluster = normalizedClusters[currentOwner.clusterIndex];
+          ownerCluster.keywords = ownerCluster.keywords.filter(
+            existingKeyword => existingKeyword.keyword.trim().toLowerCase() !== normalized
+          );
+        }
+
+        normalizedClusters[clusterIndex].keywords.push(keyword);
+        keywordOwners.set(normalized, { clusterIndex, affinity });
+      }
+    });
+  });
+
+  const orphanKeywords = [];
+  const resultClusters = [];
+
+  normalizedClusters.forEach(cluster => {
+    if (!cluster) return;
+
+    if (cluster.keywords.length >= MIN_CLUSTER_SIZE) {
+      resultClusters.push(
+        createClusterObject(resultClusters.length + 1, cluster.keywords, cluster.algorithm || 'hybrid')
+      );
+    } else {
+      orphanKeywords.push(...cluster.keywords);
+    }
+  });
+
+  if (orphanKeywords.length > 0 && resultClusters.length > 0) {
+    orphanKeywords.forEach(keyword => {
+      const bestCluster = findBestClusterForKeyword(keyword, resultClusters);
+      if (
+        bestCluster &&
+        !bestCluster.keywords.some(existing => existing.keyword.trim().toLowerCase() === keyword.keyword.trim().toLowerCase())
+      ) {
+        bestCluster.keywords.push(keyword);
+      }
+    });
+  }
+
+  return resultClusters;
 }
 
 /**
