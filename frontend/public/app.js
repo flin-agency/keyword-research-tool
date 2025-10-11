@@ -26,8 +26,6 @@ const elements = {
   googleStatusHint: document.getElementById('googleStatusHint'),
   connectGoogleBtn: document.getElementById('connectGoogleBtn'),
   refreshStatusBtn: document.getElementById('refreshStatusBtn'),
-  manualRefreshForm: document.getElementById('manualRefreshForm'),
-  manualRefreshInput: document.getElementById('manualRefreshInput'),
 };
 
 function getSelectedLanguageLabel() {
@@ -157,7 +155,7 @@ function updateGoogleActions(status) {
   if (!status || status.error) {
     connectGoogleBtn.disabled = true;
     connectGoogleBtn.title = status?.error ? status.error : 'Unable to verify Google OAuth status.';
-    connectGoogleBtn.textContent = 'Connect Google Account';
+    connectGoogleBtn.textContent = 'Connect Google Ads';
     return;
   }
 
@@ -166,7 +164,7 @@ function updateGoogleActions(status) {
   connectGoogleBtn.title = missingClientConfig
     ? 'Add GOOGLE_ADS_CLIENT_ID and GOOGLE_ADS_CLIENT_SECRET to your .env file to enable OAuth.'
     : '';
-  connectGoogleBtn.textContent = status.configured ? 'Reconnect Google Account' : 'Connect Google Account';
+  connectGoogleBtn.textContent = status.configured ? 'Reconnect Google Ads' : 'Connect Google Ads';
 }
 
 function updateGoogleStatusDisplay(status) {
@@ -187,11 +185,11 @@ function updateGoogleStatusDisplay(status) {
     } else if (status.configured) {
       badgeClass = 'status-indicator--connected';
       badgeText = 'Connected';
-      hintText = 'Refresh token stored. You can reconnect to rotate credentials at any time.';
+      hintText = 'Connected. Reconnect anytime to refresh permissions.';
     } else {
       badgeClass = 'status-indicator--disconnected';
       badgeText = 'Action required';
-      hintText = 'Click connect or paste an existing refresh token to enable Google Ads metrics.';
+      hintText = 'Click Connect Google Ads to authorize access and enable live metrics.';
     }
   } else if (status?.error) {
     badgeClass = 'status-indicator--unknown';
@@ -224,7 +222,7 @@ function updateApiWarning() {
     } else if (!state.googleAuthStatus.hasClientId || !state.googleAuthStatus.hasClientSecret) {
       missingItems.push('Google Ads OAuth client ID/secret');
     } else if (!state.googleAuthStatus.configured) {
-      missingItems.push('Google Ads refresh token');
+      missingItems.push('Google Ads authorization');
     }
   }
 
@@ -243,44 +241,6 @@ function updateApiWarning() {
     apiWarning.textContent = `⚠️ ${missingItems.join(' and ')} required for live data.`;
     apiWarning.classList.add('visible');
     apiWarning.style.display = 'block';
-  }
-}
-
-async function handleManualRefreshSubmit(event) {
-  event.preventDefault();
-
-  if (!elements.manualRefreshInput) {
-    return;
-  }
-
-  const refreshToken = elements.manualRefreshInput.value.trim();
-
-  if (!refreshToken) {
-    showError('Please paste a refresh token before saving.');
-    return;
-  }
-
-  try {
-    const response = await fetch('/api/refresh-token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    const payload = await response.json().catch(() => ({}));
-
-    if (!response.ok || payload.success === false) {
-      throw new Error(payload.error || payload.message || 'Failed to update refresh token');
-    }
-
-    elements.manualRefreshInput.value = '';
-    showSuccess(payload.message || 'Refresh token saved successfully.');
-    await loadIntegrationStatus();
-  } catch (error) {
-    console.error('Failed to update refresh token:', error);
-    showError(error.message || 'Failed to update refresh token.');
   }
 }
 
@@ -527,10 +487,6 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.refreshStatusBtn.addEventListener('click', () => {
       loadIntegrationStatus(true);
     });
-  }
-
-  if (elements.manualRefreshForm) {
-    elements.manualRefreshForm.addEventListener('submit', handleManualRefreshSubmit);
   }
 
   updateProgress(0, 'Ready');
