@@ -130,10 +130,8 @@ keyword-research-tool/
 │   └── .env.example                 # Python service env template
 ├── frontend/
 │   └── public/
-│       ├── index-improved.html      # Primary UI
-│       ├── app-improved.js          # Frontend logic
-│       ├── index-simple.html        # Legacy simple UI (not used by default)
-│       └── app.js                   # Legacy script (not used by default)
+│       ├── index.html               # Unified UI
+│       └── app.js                   # Frontend logic
 ├── tests/
 │   ├── exporter.test.js
 │   └── scraper.test.js

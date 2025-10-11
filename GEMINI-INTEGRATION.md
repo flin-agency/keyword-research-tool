@@ -278,7 +278,7 @@ GEMINI_ENHANCE_LIMIT=5  # Default
    - Passes website context to clustering
    - Awaits clustering results and preserves language labels
 
-4. **`frontend/public/app-improved.js`** (MODIFIED)
+4. **`frontend/public/app.js`** (MODIFIED)
    - Displays AI badges
    - Shows descriptions & strategies
    - Highlights priority clusters

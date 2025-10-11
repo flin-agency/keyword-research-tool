@@ -38,10 +38,8 @@ keyword-research-tool/
 │   └── server.js                     # Express server (improved stack)
 ├── frontend/
 │   └── public/
-│       ├── index-improved.html       # Primary UI
-│       ├── app-improved.js           # Research workflow UI logic
-│       ├── index-simple.html         # Legacy fallback UI (not part of setup)
-│       └── app.js                    # Legacy simple UI script (not part of setup)
+│       ├── index.html                # Unified UI
+│       └── app.js                    # Research workflow UI logic
 ├── python-ads-service/               # Python helper (optional deployment)
 ├── tests/                            # Remaining scraper/exporter coverage
 ├── utils/                            # Language utilities and demo data

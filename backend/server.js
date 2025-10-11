@@ -60,7 +60,7 @@ app.use((req, res, next) => {
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '../frontend/public'), {
-  index: 'index-improved.html',
+  index: 'index.html',
   maxAge: config.environment === 'production' ? '1d' : 0,
 }));
 
@@ -127,7 +127,7 @@ app.use('/api', (req, res) => {
 
 // Catch-all route for frontend (SPA support)
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/public/index-improved.html'));
+  res.sendFile(path.join(__dirname, '../frontend/public/index.html'));
 });
 
 // Global error handling middleware
