@@ -65,14 +65,23 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 
 6. **Start both services**
 
-   **Terminal 1 - Python microservice (port 5001):**
+   **Terminal 1 – Python microservice (port 5001):**
    ```bash
    cd python-ads-service
+
+   # macOS/Linux
    PYTHON_SERVICE_PORT=5001 python3 app.py
+
+   # Windows (PowerShell)
+   $env:PYTHON_SERVICE_PORT=5001; python app.py
    ```
 
-   **Terminal 2 - Node.js server (port 3000):**
+   **Terminal 2 – Node.js server + frontend (port 3000):**
    ```bash
+   # macOS/Linux (bash/zsh)
+   USE_IMPROVED_API=true node backend/server-improved.js
+
+   # Windows (PowerShell or Command Prompt)
    npm run start:improved
    ```
 

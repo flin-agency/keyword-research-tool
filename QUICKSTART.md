@@ -34,11 +34,12 @@ Open two terminals:
 ```bash
 # Terminal A – Python Google Ads microservice
 cd python-ads-service
-python3 app.py  # listens on port 5001 by default
+PYTHON_SERVICE_PORT=5001 python3 app.py  # macOS/Linux
+# Windows (PowerShell): $env:PYTHON_SERVICE_PORT=5001; python app.py
 
 # Terminal B – Node.js backend + frontend
-# macOS/Linux
-npx cross-env USE_IMPROVED_API=true node backend/server-improved.js
+# macOS/Linux (bash/zsh)
+USE_IMPROVED_API=true node backend/server-improved.js
 
 # Windows (PowerShell or Command Prompt)
 npm run start:improved
