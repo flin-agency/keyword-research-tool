@@ -450,32 +450,42 @@
 
     .url-list {
       list-style: none;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
       padding: 0;
       margin: 0;
+      display: block;
     }
 
     .url-list.is-collapsed {
       display: none !important;
     }
 
-    .url-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      border-radius: 999px;
+    .url-item {
+      display: block;
+      margin-bottom: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
       background: #ede9fe;
-      color: #4c1d95;
-      font-size: 0.9rem;
-      word-break: break-word;
     }
 
-    .url-pill span {
+    .url-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .url-index {
       font-weight: 600;
       color: #3730a3;
+      margin-right: 8px;
+    }
+
+    .url-item a {
+      color: #4c1d95;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .url-item a:hover,
+    .url-item a:focus {
+      text-decoration: underline;
     }
 
     .empty-state {
@@ -736,7 +746,7 @@
       </div>
 
       <div class="card">
-        <h2>Content Insights</h2>
+        <h2>Crawled URLs</h2>
         <div class="content-insights">
           <div class="content-section collapsible">
             <h3 class="collapsible-heading">

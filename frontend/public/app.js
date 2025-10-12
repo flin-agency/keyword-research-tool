@@ -377,7 +377,16 @@ function displayResults(data) {
       elements.contentUrls.innerHTML = '<li class="empty-state">No URLs collected.</li>';
     } else {
       elements.contentUrls.innerHTML = urlsSource
-        .map((url, index) => `<li class="url-pill"><span>${index + 1}.</span>${escapeHtml(url)}</li>`)
+        .map((url, index) => {
+          const safeLabel = escapeHtml(url);
+          const safeHref = typeof url === 'string' ? encodeURI(url) : '#';
+          return `
+            <li class="url-item">
+              <span class="url-index">${index + 1}.</span>
+              <a href="${safeHref}" target="_blank" rel="noopener noreferrer">${safeLabel}</a>
+            </li>
+          `;
+        })
         .join('');
     }
 
