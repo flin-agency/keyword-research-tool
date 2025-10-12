@@ -529,29 +529,35 @@ function displayResults(data) {
       >
         <div class="cluster-title-wrap">
           <div class="cluster-title">${cluster.pillarTopic}</div>
-          <div class="cluster-subtitle">Click to preview the keyword ideas in this cluster.</div>
         </div>
         <div class="cluster-badge" aria-label="${cluster.keywords?.length || 0} keywords available">${cluster.keywords?.length || 0} keywords</div>
-      </div>
-      <div class="cluster-meta">
-        <div class="cluster-meta-item">
-          <span class="cluster-meta-label">Volume</span>
-          <span class="cluster-meta-value">${cluster.totalSearchVolume?.toLocaleString() || 0}</span>
-        </div>
-        <div class="cluster-meta-item">
-          <span class="cluster-meta-label">Competition</span>
-          <span class="cluster-meta-value">${cluster.avgCompetition || 'N/A'}</span>
-        </div>
-        <div class="cluster-meta-item">
-          <span class="cluster-meta-label">Score</span>
-          <span class="cluster-meta-value">${cluster.clusterValueScore || 0}</span>
-        </div>
       </div>
       ${cluster.aiDescription ? `<div class="cluster-description">${cluster.aiDescription}</div>` : ''}
       ${cluster.aiContentStrategy ? `<div class="cluster-strategy">✨ <strong>Content Strategy:</strong> ${cluster.aiContentStrategy}</div>` : ''}
       <div class="cluster-hint">
         <span aria-hidden="true">💡</span>
-        <span><strong>Tip:</strong> Click the <strong>${cluster.keywords?.length || 0} keywords</strong> pill above to show the detailed keyword list below.</span>
+        <div class="cluster-hint-body">
+          <p class="cluster-hint-text"><strong>Tip:</strong> Click the <strong>${cluster.keywords?.length || 0} keywords</strong> pill above to show the detailed keyword list below.</p>
+          <div class="cluster-hint-stats" role="list">
+            <div class="hint-chip hint-chip-keywords" role="listitem" aria-label="${cluster.keywords?.length || 0} keywords in this cluster">
+              <span class="hint-chip-value">${cluster.keywords?.length || 0}</span>
+              <span class="hint-chip-label">keywords</span>
+              <span class="hint-chip-caret" aria-hidden="true">▾</span>
+            </div>
+            <div class="hint-chip" role="listitem" aria-label="Total search volume ${cluster.totalSearchVolume?.toLocaleString() || 0}">
+              <span class="hint-chip-label">Volume</span>
+              <span class="hint-chip-value">${cluster.totalSearchVolume?.toLocaleString() || 0}</span>
+            </div>
+            <div class="hint-chip" role="listitem" aria-label="Competition ${cluster.avgCompetition || 'N/A'}">
+              <span class="hint-chip-label">Competition</span>
+              <span class="hint-chip-value">${cluster.avgCompetition || 'N/A'}</span>
+            </div>
+            <div class="hint-chip" role="listitem" aria-label="Score ${cluster.clusterValueScore || 0}">
+              <span class="hint-chip-label">Score</span>
+              <span class="hint-chip-value">${cluster.clusterValueScore || 0}</span>
+            </div>
+          </div>
+        </div>
       </div>
       <div id="cluster-${index}" class="cluster-details" style="display: none;">
         <table class="keywords-table">
