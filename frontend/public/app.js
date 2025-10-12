@@ -3,6 +3,8 @@ const state = {
   pollInterval: null,
   googleAuthStatus: null,
   apiInfo: null,
+  showIntegrationSettings: false,
+  showCrawlSettings: false,
 };
 
 const elements = {
@@ -28,6 +30,15 @@ const elements = {
   googleStatusHint: document.getElementById('googleStatusHint'),
   connectGoogleBtn: document.getElementById('connectGoogleBtn'),
   refreshStatusBtn: document.getElementById('refreshStatusBtn'),
+  integrationCard: document.getElementById('integrationCard'),
+  integrationSummary: document.getElementById('integrationSummary'),
+  integrationSummaryBadge: document.getElementById('integrationSummaryBadge'),
+  integrationSummaryText: document.getElementById('integrationSummaryText'),
+  showIntegrationSettingsBtn: document.getElementById('showIntegrationSettingsBtn'),
+  hideIntegrationSettingsBtn: document.getElementById('hideIntegrationSettingsBtn'),
+  refreshStatusSummaryBtn: document.getElementById('refreshStatusSummaryBtn'),
+  crawlOptions: document.getElementById('crawlOptions'),
+  toggleCrawlSettingsBtn: document.getElementById('toggleCrawlSettingsBtn'),
 };
 
 const textEscaper = typeof document !== 'undefined' ? document.createElement('div') : null;
@@ -82,6 +93,16 @@ function safeDecode(value) {
   }
 }
 
+function isGoogleIntegrationConfigured(status) {
+  return Boolean(
+    status &&
+      !status.error &&
+      status.hasClientId &&
+      status.hasClientSecret &&
+      status.configured,
+  );
+}
+
 function handleRedirectMessages() {
   const params = new URLSearchParams(window.location.search);
   if (!params || params.size === 0) {
@@ -117,7 +138,19 @@ async function loadIntegrationStatus(showMessages = false) {
     }
 
     const status = await response.json();
+    const previousStatus = state.googleAuthStatus;
+    const firstLoad = previousStatus === null;
+    const wasConfigured = isGoogleIntegrationConfigured(previousStatus);
+    const isConfigured = isGoogleIntegrationConfigured(status);
+
     state.googleAuthStatus = status;
+
+    if (firstLoad) {
+      state.showIntegrationSettings = !isConfigured;
+    } else if (!wasConfigured && isConfigured) {
+      state.showIntegrationSettings = false;
+    }
+
     updateGoogleStatusDisplay(status);
     updateApiWarning();
 
@@ -129,6 +162,7 @@ async function loadIntegrationStatus(showMessages = false) {
   } catch (error) {
     console.error('Failed to load Google OAuth status:', error);
     state.googleAuthStatus = { error: error.message };
+    state.showIntegrationSettings = true;
     updateGoogleStatusDisplay(state.googleAuthStatus);
     updateApiWarning();
 
@@ -215,6 +249,81 @@ function updateGoogleStatusDisplay(status) {
   googleStatusHint.textContent = hintText;
 
   updateGoogleActions(status);
+  updateIntegrationSummary(badgeClass, badgeText, hintText, status);
+}
+
+function updateIntegrationSummary(badgeClass, badgeText, hintText, status) {
+  const { integrationSummaryBadge, integrationSummaryText } = elements;
+
+  if (integrationSummaryBadge) {
+    integrationSummaryBadge.className = `status-indicator ${badgeClass}`;
+    integrationSummaryBadge.textContent = badgeText;
+  }
+
+  if (integrationSummaryText) {
+    integrationSummaryText.textContent = hintText;
+  }
+
+  updateIntegrationVisibility(status);
+}
+
+function updateIntegrationVisibility(status) {
+  const {
+    integrationCard,
+    integrationSummary,
+    showIntegrationSettingsBtn,
+    hideIntegrationSettingsBtn,
+  } = elements;
+
+  if (!integrationCard) {
+    return;
+  }
+
+  const fullyConfigured = isGoogleIntegrationConfigured(status);
+
+  if (!fullyConfigured) {
+    state.showIntegrationSettings = true;
+  }
+
+  const showCard = state.showIntegrationSettings || !fullyConfigured;
+  const showSummary = fullyConfigured && !state.showIntegrationSettings;
+
+  integrationCard.classList.toggle('hidden', !showCard);
+
+  if (integrationSummary) {
+    integrationSummary.classList.toggle('hidden', !showSummary);
+  }
+
+  if (showIntegrationSettingsBtn) {
+    showIntegrationSettingsBtn.classList.toggle('hidden', !showSummary);
+  }
+
+  if (hideIntegrationSettingsBtn) {
+    hideIntegrationSettingsBtn.classList.toggle('hidden', !fullyConfigured);
+  }
+}
+
+function setIntegrationSettingsVisibility(visible) {
+  const fullyConfigured = isGoogleIntegrationConfigured(state.googleAuthStatus);
+  state.showIntegrationSettings = visible || !fullyConfigured;
+  updateIntegrationVisibility(state.googleAuthStatus);
+}
+
+function setCrawlSettingsVisibility(visible) {
+  state.showCrawlSettings = visible;
+
+  if (elements.crawlOptions) {
+    elements.crawlOptions.classList.toggle('hidden', !visible);
+  }
+
+  if (elements.toggleCrawlSettingsBtn) {
+    elements.toggleCrawlSettingsBtn.setAttribute('aria-expanded', String(visible));
+    elements.toggleCrawlSettingsBtn.textContent = visible ? 'Hide crawl settings' : 'Show crawl settings';
+  }
+}
+
+function toggleCrawlSettings() {
+  setCrawlSettingsVisibility(!state.showCrawlSettings);
 }
 
 function updateApiWarning() {
@@ -408,17 +517,42 @@ function displayResults(data) {
     const clusterDiv = document.createElement('div');
     clusterDiv.className = 'cluster';
     clusterDiv.innerHTML = `
-      <div class="cluster-header" onclick="toggleCluster(${index})">
-        <div class="cluster-title">${cluster.pillarTopic}</div>
-        <div class="cluster-badge">${cluster.keywords?.length || 0} keywords</div>
+      <div
+        class="cluster-header"
+        data-cluster-index="${index}"
+        role="button"
+        tabindex="0"
+        aria-expanded="false"
+        aria-controls="cluster-${index}"
+        onclick="toggleCluster(${index})"
+        onkeypress="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCluster(${index});}"
+      >
+        <div class="cluster-title-wrap">
+          <div class="cluster-title">${cluster.pillarTopic}</div>
+          <div class="cluster-subtitle">Click to preview the keyword ideas in this cluster.</div>
+        </div>
+        <div class="cluster-badge" aria-label="${cluster.keywords?.length || 0} keywords available">${cluster.keywords?.length || 0} keywords</div>
       </div>
       <div class="cluster-meta">
-        <span>📊 Volume: ${cluster.totalSearchVolume?.toLocaleString() || 0}</span>
-        <span>🎯 Competition: ${cluster.avgCompetition || 'N/A'}</span>
-        <span>💯 Score: ${cluster.clusterValueScore || 0}</span>
+        <div class="cluster-meta-item">
+          <span class="cluster-meta-label">Volume</span>
+          <span class="cluster-meta-value">${cluster.totalSearchVolume?.toLocaleString() || 0}</span>
+        </div>
+        <div class="cluster-meta-item">
+          <span class="cluster-meta-label">Competition</span>
+          <span class="cluster-meta-value">${cluster.avgCompetition || 'N/A'}</span>
+        </div>
+        <div class="cluster-meta-item">
+          <span class="cluster-meta-label">Score</span>
+          <span class="cluster-meta-value">${cluster.clusterValueScore || 0}</span>
+        </div>
       </div>
       ${cluster.aiDescription ? `<div class="cluster-description">${cluster.aiDescription}</div>` : ''}
       ${cluster.aiContentStrategy ? `<div class="cluster-strategy">✨ <strong>Content Strategy:</strong> ${cluster.aiContentStrategy}</div>` : ''}
+      <div class="cluster-hint">
+        <span aria-hidden="true">💡</span>
+        <span><strong>Tip:</strong> Click the <strong>${cluster.keywords?.length || 0} keywords</strong> pill above to show the detailed keyword list below.</span>
+      </div>
       <div id="cluster-${index}" class="cluster-details" style="display: none;">
         <table class="keywords-table">
           <thead>
@@ -457,8 +591,14 @@ function displayResults(data) {
 
 function toggleCluster(index) {
   const content = document.getElementById(`cluster-${index}`);
+  const header = document.querySelector(`.cluster-header[data-cluster-index="${index}"]`);
   if (content) {
-    content.style.display = content.style.display === 'none' ? 'block' : 'none';
+    const willShow = content.style.display === 'none';
+    content.style.display = willShow ? 'block' : 'none';
+    if (header) {
+      header.setAttribute('aria-expanded', String(willShow));
+      header.classList.toggle('is-open', willShow);
+    }
   }
 }
 
@@ -564,9 +704,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (elements.refreshStatusSummaryBtn) {
+    elements.refreshStatusSummaryBtn.addEventListener('click', () => {
+      loadIntegrationStatus(true);
+    });
+  }
+
+  if (elements.showIntegrationSettingsBtn) {
+    elements.showIntegrationSettingsBtn.addEventListener('click', () => {
+      setIntegrationSettingsVisibility(true);
+    });
+  }
+
+  if (elements.hideIntegrationSettingsBtn) {
+    elements.hideIntegrationSettingsBtn.addEventListener('click', () => {
+      setIntegrationSettingsVisibility(false);
+    });
+  }
+
+  if (elements.toggleCrawlSettingsBtn) {
+    elements.toggleCrawlSettingsBtn.addEventListener('click', toggleCrawlSettings);
+  }
+
   if (elements.crawledUrlsToggle) {
     elements.crawledUrlsToggle.addEventListener('click', toggleCrawledUrls);
   }
+
+  setCrawlSettingsVisibility(state.showCrawlSettings);
 
   updateProgress(0, 'Ready');
   handleRedirectMessages();
