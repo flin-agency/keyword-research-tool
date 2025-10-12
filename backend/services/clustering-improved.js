@@ -255,7 +255,10 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
     }
 
     // Final safety pass to guarantee keyword uniqueness
-    return ensureUniqueKeywords(clusters);
+    clusters = ensureUniqueKeywords(clusters);
+
+    // Ensure every cluster ships with human-readable insights even without AI
+    return applyClusterNarratives(clusters, websiteContext);
 
   } catch (error) {
     console.error('[Clustering] Error:', error);
@@ -819,9 +822,28 @@ function ensureUniqueKeywords(clusters) {
     if (!cluster) return;
 
     if (cluster.keywords.length >= MIN_CLUSTER_SIZE) {
-      resultClusters.push(
-        createClusterObject(resultClusters.length + 1, cluster.keywords, cluster.algorithm || 'hybrid')
+      const baseCluster = createClusterObject(
+        resultClusters.length + 1,
+        cluster.keywords,
+        cluster.algorithm || 'hybrid'
       );
+
+      const mergedCluster = {
+        ...baseCluster,
+        pillarTopic: cluster.pillarTopic || baseCluster.pillarTopic,
+      };
+
+      Object.keys(cluster || {})
+        .filter(key => key.startsWith('ai') && typeof cluster[key] === 'string' && cluster[key].trim())
+        .forEach(key => {
+          mergedCluster[key] = cluster[key];
+        });
+
+      if (cluster.aiEnhanced) {
+        mergedCluster.aiEnhanced = cluster.aiEnhanced;
+      }
+
+      resultClusters.push(mergedCluster);
     } else {
       orphanKeywords.push(...cluster.keywords);
     }
@@ -840,6 +862,133 @@ function ensureUniqueKeywords(clusters) {
   }
 
   return resultClusters;
+}
+
+function extractTopKeywordPhrases(cluster, limit = 5) {
+  if (!cluster || !Array.isArray(cluster.keywords)) {
+    return [];
+  }
+
+  return cluster.keywords
+    .map(keyword => (typeof keyword?.keyword === 'string' ? keyword.keyword.trim() : ''))
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function formatKeywordList(keywords) {
+  const unique = Array.from(new Set(keywords.filter(Boolean)));
+
+  if (unique.length === 0) {
+    return '';
+  }
+
+  if (unique.length === 1) {
+    return unique[0];
+  }
+
+  if (unique.length === 2) {
+    return `${unique[0]} and ${unique[1]}`;
+  }
+
+  const initial = unique.slice(0, -1).join(', ');
+  return `${initial}, and ${unique[unique.length - 1]}`;
+}
+
+function summarizeWebsiteContext(websiteContext = {}) {
+  const { title, description, url } = websiteContext || {};
+  const candidates = [title, description, url]
+    .map(value => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
+
+  if (candidates.length === 0) {
+    return '';
+  }
+
+  const summary = candidates[0];
+  return summary.length > 140 ? `${summary.slice(0, 137)}...` : summary;
+}
+
+function buildFallbackClusterDescription(cluster, websiteContext = {}) {
+  const baseTopic = typeof cluster?.pillarTopic === 'string' && cluster.pillarTopic.trim()
+    ? cluster.pillarTopic.trim()
+    : 'this topic';
+
+  const topKeywords = extractTopKeywordPhrases(cluster, 4);
+  const primaryKeyword = topKeywords[0] || baseTopic;
+  const supportingKeywords = topKeywords
+    .slice(1)
+    .filter(keyword => keyword.toLowerCase() !== primaryKeyword.toLowerCase());
+
+  let description = `This cluster groups searches about ${primaryKeyword}.`;
+  const supportingText = formatKeywordList(supportingKeywords);
+
+  if (supportingText) {
+    description += ` Related queries include ${supportingText}.`;
+  }
+
+  const siteSummary = summarizeWebsiteContext(websiteContext);
+  if (siteSummary) {
+    description += ` Align your coverage with what people expect from ${siteSummary}.`;
+  } else {
+    description += ' Emphasize clear explanations and practical examples to satisfy search intent.';
+  }
+
+  return description;
+}
+
+function buildFallbackClusterStrategy(cluster, websiteContext = {}) {
+  const baseTopic = typeof cluster?.pillarTopic === 'string' && cluster.pillarTopic.trim()
+    ? cluster.pillarTopic.trim()
+    : 'the main topic';
+
+  const topKeywords = extractTopKeywordPhrases(cluster, 5);
+  const primaryKeyword = topKeywords[0] || baseTopic;
+  const supportingKeywords = topKeywords
+    .slice(1, 4)
+    .filter(keyword => keyword.toLowerCase() !== primaryKeyword.toLowerCase());
+
+  const supportingText = formatKeywordList(supportingKeywords);
+
+  const strategyParts = [
+    `Create an authoritative piece focused on ${primaryKeyword}.`,
+  ];
+
+  if (supportingText) {
+    strategyParts.push(`Structure the content to answer related searches like ${supportingText}.`);
+  }
+
+  const siteSummary = summarizeWebsiteContext(websiteContext);
+  if (siteSummary) {
+    strategyParts.push(`Demonstrate how ${siteSummary} solves the reader's problem and include proof of expertise.`);
+  } else {
+    strategyParts.push('Incorporate real examples, data, or case studies from your brand to build authority.');
+  }
+
+  return strategyParts.join(' ');
+}
+
+function applyClusterNarratives(clusters, websiteContext = {}) {
+  if (!Array.isArray(clusters)) {
+    return [];
+  }
+
+  return clusters.map(cluster => {
+    if (!cluster) {
+      return cluster;
+    }
+
+    const enrichedCluster = { ...cluster };
+
+    if (!enrichedCluster.aiDescription || !enrichedCluster.aiDescription.trim()) {
+      enrichedCluster.aiDescription = buildFallbackClusterDescription(enrichedCluster, websiteContext);
+    }
+
+    if (!enrichedCluster.aiContentStrategy || !enrichedCluster.aiContentStrategy.trim()) {
+      enrichedCluster.aiContentStrategy = buildFallbackClusterStrategy(enrichedCluster, websiteContext);
+    }
+
+    return enrichedCluster;
+  });
 }
 
 /**

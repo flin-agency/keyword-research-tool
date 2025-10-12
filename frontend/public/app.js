@@ -22,6 +22,7 @@ const elements = {
   contentDescription: document.getElementById('contentDescription'),
   contentStrategy: document.getElementById('contentStrategy'),
   contentUrls: document.getElementById('contentUrls'),
+  crawledUrlsToggle: document.getElementById('crawledUrlsToggle'),
   exportCsv: document.getElementById('exportCsv'),
   exportJson: document.getElementById('exportJson'),
   apiWarning: document.getElementById('apiWarning'),
@@ -411,6 +412,11 @@ function displayResults(data) {
   }
 
   if (elements.contentUrls) {
+    if (elements.crawledUrlsToggle) {
+      elements.crawledUrlsToggle.setAttribute('aria-expanded', 'false');
+      elements.crawledUrlsToggle.classList.remove('is-open');
+    }
+
     const urlsSource = Array.isArray(data.crawledUrls) && data.crawledUrls.length > 0
       ? data.crawledUrls
       : (data.scrapedContent?.pages || []).map((page) => page?.url).filter((url) => typeof url === 'string' && url.trim());
@@ -421,6 +427,18 @@ function displayResults(data) {
       elements.contentUrls.innerHTML = urlsSource
         .map((url, index) => `<li class="url-pill"><span>${index + 1}.</span>${escapeHtml(url)}</li>`)
         .join('');
+    }
+
+    elements.contentUrls.classList.add('is-collapsed');
+    elements.contentUrls.hidden = true;
+
+    if (elements.crawledUrlsToggle) {
+      const baseLabel = elements.crawledUrlsToggle.dataset?.label || 'Crawled URLs';
+      const labelNode = elements.crawledUrlsToggle.querySelector('.toggle-label');
+      if (labelNode) {
+        const count = urlsSource?.length || 0;
+        labelNode.textContent = `${baseLabel} (${count})`;
+      }
     }
   }
 
@@ -480,6 +498,20 @@ function toggleCluster(index) {
   const content = document.getElementById(`cluster-${index}`);
   if (content) {
     content.style.display = content.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+function toggleCrawledUrls() {
+  if (!elements.contentUrls) {
+    return;
+  }
+
+  const isCollapsed = elements.contentUrls.classList.toggle('is-collapsed');
+  elements.contentUrls.hidden = isCollapsed;
+
+  if (elements.crawledUrlsToggle) {
+    elements.crawledUrlsToggle.setAttribute('aria-expanded', String(!isCollapsed));
+    elements.crawledUrlsToggle.classList.toggle('is-open', !isCollapsed);
   }
 }
 
@@ -571,9 +603,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (elements.crawledUrlsToggle) {
+    elements.crawledUrlsToggle.addEventListener('click', toggleCrawledUrls);
+  }
+
   updateProgress(0, 'Ready');
   handleRedirectMessages();
   initializeIntegrations();
 });
 
 window.toggleCluster = toggleCluster;
+window.toggleCrawledUrls = toggleCrawledUrls;
