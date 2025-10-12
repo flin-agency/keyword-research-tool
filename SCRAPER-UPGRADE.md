@@ -4,9 +4,9 @@
 
 Puppeteer was unstable in certain environments, causing websocket errors and browser crashes. This prevented real website scraping.
 
-## Solution: Multi-Strategy Scraper
+## Solution: Unified Multi-Strategy Scraper
 
-Created `scraper-v2.js` with 3-tier fallback system:
+The legacy Puppeteer crawler has been retired in favor of `scraper-unified.js`, which consolidates the resilient Playwright and Axios strategies behind a single entry point:
 
 ### Strategy 1: Playwright (Primary)
 - **Best for**: JavaScript-heavy sites, SPAs, dynamic content
@@ -19,10 +19,6 @@ Created `scraper-v2.js` with 3-tier fallback system:
 - **Speed**: 10x faster than browser automation
 - **Lightweight**: No browser overhead
 - **Success Rate**: ~70% for static sites
-
-### Strategy 3: Demo Data (Ultimate Fallback)
-- **Ensures**: Tool never fails completely
-- **Provides**: Realistic sample content for testing
 
 ## Real Results - flin.agency
 
@@ -60,7 +56,7 @@ async function scrapeWebsite(url) {
     console.warn('Axios failed');
   }
 
-  // Strategy 3: Throw (API will catch and use demo data)
+  // Strategy 3: Throw (API will handle any remaining fallbacks)
   throw new Error('All strategies failed');
 }
 ```
@@ -83,7 +79,7 @@ async function scrapeWebsite(url) {
 - Try-catch at multiple levels
 - Graceful degradation
 - Detailed logging for debugging
-- Never fails completely
+- Structured errors for upstream fallbacks
 
 ### 4. Content Extraction
 - Removes scripts, styles, nav, footer
@@ -101,7 +97,7 @@ npx playwright install chromium
 ## Usage
 
 ```javascript
-const scraper = require('./services/scraper-v2');
+const scraper = require('./services/scraper-unified');
 
 // Will try all strategies automatically
 const content = await scraper.scrapeWebsite('https://example.com');
@@ -112,11 +108,10 @@ console.log(content.totalWords);   // Total words
 
 ## Benefits
 
-1. **Reliability**: 3 fallback strategies ensure success
+1. **Reliability**: Playwright-first approach with Axios fallback maximizes success
 2. **Speed**: Axios fallback is fast for static sites
 3. **Robustness**: Handles JS-heavy and static sites
-4. **Never Fails**: Demo data as ultimate backup
-5. **Real Data**: Successfully scrapes actual websites
+4. **Real Data**: Successfully scrapes actual websites
 
 ## Performance
 
@@ -124,7 +119,6 @@ console.log(content.totalWords);   // Total words
 |----------|-------|--------------|----------|
 | Playwright | ~30s | 90% | JavaScript sites |
 | Axios | ~3s | 70% | Static HTML |
-| Demo Data | Instant | 100% | Fallback |
 
 ## Comparison to Puppeteer
 
@@ -139,15 +133,14 @@ console.log(content.totalWords);   // Total words
 ## What Changed
 
 ### Files Modified
-- `backend/api/research.js` - Now uses `scraper-v2`
-- `package.json` - Added `playwright` and `axios`
+- `backend/api/research.js` - Points to `scraper-unified`
+- `package.json` - Adds `playwright` and `axios`
 
 ### Files Added
-- `backend/services/scraper-v2.js` - New multi-strategy scraper
-- `backend/utils/demo-data.js` - Fallback demo content
+- `backend/services/scraper-unified.js` - Unified multi-strategy scraper
 
-### Old Files (Deprecated)
-- `backend/services/scraper.js` - Old Puppeteer version (kept for reference)
+### Legacy Files
+- `backend/services/scraper.js` and `backend/services/scraper-v2.js` have been removed (see git history if needed)
 
 ## Logs Example
 
@@ -167,7 +160,7 @@ Tested successfully with:
 - ✅ https://flin.agency/ (complex multi-page site)
 - ✅ JavaScript-heavy single-page apps
 - ✅ Static HTML sites (via Axios fallback)
-- ✅ Protected sites (falls back to demo data)
+- ✅ Protected sites (returns structured fallback errors)
 
 ## Troubleshooting
 
@@ -199,6 +192,6 @@ MAX_PAGES_TO_SCAN=10
 
 ## Conclusion
 
-The new multi-strategy scraper is production-ready and successfully scrapes real websites with high reliability. Playwright provides the stability needed for browser automation, while Axios ensures speed for simpler sites. Combined with demo data fallback, the tool never fails.
+The unified multi-strategy scraper is production-ready and successfully scrapes real websites with high reliability. Playwright provides the stability needed for browser automation, while Axios ensures speed for simpler sites. When both strategies fail, the API now surfaces structured errors so upstream fallbacks can respond appropriately.
 
-**Result**: 100% uptime with real data whenever possible.
+**Result**: Dramatically improved reliability with transparent failure handling.

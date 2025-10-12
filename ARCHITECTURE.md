@@ -34,7 +34,7 @@
 │  │                                                           │  │
 │  │  ┌────────────┐  ┌──────────────┐  ┌────────────────┐  │  │
 │  │  │  Scraper   │→ │   Keyword    │→ │  Google Ads    │  │  │
-│  │  │ (Puppeteer)│  │  Extractor   │  │      API       │  │  │
+│  │  │ (Playwright)│  │  Extractor   │  │      API       │  │  │
 │  │  └────────────┘  │   (NLP)      │  │  (or Mock)     │  │  │
 │  │                  └──────────────┘  └────────────────┘  │  │
 │  │                         ↓                    ↓            │  │
@@ -60,7 +60,7 @@
 │                                                                  │
 │  ┌──────────────┐   ┌──────────────────┐   ┌──────────────┐   │
 │  │   Target     │   │  Google Ads API  │   │  Chromium    │   │
-│  │   Website    │   │   (optional)     │   │  (Puppeteer) │   │
+│  │   Website    │   │   (optional)     │   │ (Playwright) │   │
 │  └──────────────┘   └──────────────────┘   └──────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -82,7 +82,7 @@
        ↓
 
 3. Website Scraping
-   └─> Launch Puppeteer (headless browser)
+   └─> Launch Playwright (headless browser) or Axios fallback
        └─> Visit homepage
        └─> Extract: titles, headings, paragraphs, meta, alt text
        └─> Follow internal links (max 20 pages)
@@ -140,7 +140,7 @@
 
 ## Module Responsibilities
 
-### 1. Scraper Module (`scraper.js`)
+### 1. Scraper Module (`scraper-unified.js`)
 
 **Purpose**: Extract content from websites
 
@@ -168,7 +168,7 @@
 - `extractContentFromHTML(html, url)` - Parse HTML with Cheerio
 - `validateUrl(url)` - Check if URL is accessible
 
-**Technologies**: Puppeteer, Cheerio
+**Technologies**: Playwright, Axios, Cheerio
 
 ---
 
@@ -342,7 +342,7 @@
 - CORS enabled
 - Environment variables for secrets
 - No user data persistence
-- Puppeteer sandboxing
+- Playwright browser sandboxing
 
 ### Production Additions
 - HTTPS enforcement

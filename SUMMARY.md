@@ -62,7 +62,7 @@ The app is served at [http://localhost:3000](http://localhost:3000). Provide Goo
 ## 🔧 Tech Stack Highlights
 
 - **Runtime**: Node.js + Express
-- **Scraping**: Puppeteer-driven unified scraper
+- **Scraping**: Playwright/Axios unified scraper
 - **AI**: Google Gemini (keyword extraction, cluster enrichment)
 - **Clustering**: Density-based + semantic hybrid clustering
 - **Exports**: CSV/JSON via `json2csv`

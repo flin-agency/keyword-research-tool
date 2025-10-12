@@ -93,7 +93,7 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 | `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | Manager account ID (without dashes) | Yes* | `python-ads-service/app.py` |
 | `GOOGLE_ADS_REDIRECT_URI` | Override OAuth redirect URI | No | `backend/api/auth-google.js` |
 | `GEMINI_API_KEY` | Gemini AI API key | No** | `backend/services/gemini.js`, `backend/services/clustering-improved.js`, `backend/server.js` |
-| `MAX_PAGES_TO_SCAN` | Maximum pages to crawl per domain (default: 20) | No | `backend/services/scraper-unified.js`, `backend/services/scraper.js`, `backend/services/scraper-v2.js` |
+| `MAX_PAGES_TO_SCAN` | Maximum pages to crawl per domain (default: 20) | No | `backend/services/scraper-unified.js` |
 | `SCRAPER_TIMEOUT` | Playwright page timeout in ms (default: 30000) | No | `backend/services/scraper-unified.js` |
 | `MAX_KEYWORDS` | Maximum keywords to enrich (default: 500) | No | `backend/services/google-ads-python.js`, `python-ads-service/app.py` |
 | `MIN_SEARCH_VOLUME` | Minimum monthly search volume (default: 10) | No | `backend/services/google-ads-python.js`, `python-ads-service/app.py` |
@@ -147,7 +147,7 @@ The tool uses a **microservice architecture** with two main components:
 
 ### Workflow
 
-1. **Website Scanning** - Scrapes your target website using the unified Puppeteer strategies
+1. **Website Scanning** - Scrapes your target website using the unified Playwright/Axios strategies
 2. **AI Keyword Extraction** - Gemini AI analyzes content and extracts marketing-relevant keywords (with a headings fallback)
 3. **Google Ads Enrichment** - Node.js service calls the Python microservice which fetches real search volumes, CPC, and competition data from Google Ads API v21
 4. **Smart Clustering** - Groups keywords using hybrid density/semantic clustering and scores clusters
@@ -249,7 +249,7 @@ English, German, French, Italian, Spanish, Dutch, Portuguese, Polish, Russian, J
 
 ### Scraping Issues
 - **ECONNRESET errors**: The tool automatically falls back to Axios scraping
-- **Timeout errors**: Increase timeout in scraper-v2.js
+- **Timeout errors**: Increase timeout in `backend/services/scraper-unified.js`
 - **Blocked by website**: Some sites block automated scraping
 
 ### API Issues
