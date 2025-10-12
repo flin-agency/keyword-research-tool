@@ -533,6 +533,12 @@ function displayResults(data) {
         <div class="cluster-badge" aria-label="${cluster.keywords?.length || 0} keywords available">${cluster.keywords?.length || 0} keywords</div>
       </div>
       ${cluster.aiDescription ? `<div class="cluster-description">${cluster.aiDescription}</div>` : ''}
+      <div class="cluster-metrics">
+        <span>🧮 Keywords: ${cluster.keywords?.length || 0}</span>
+        <span>📊 Volume: ${cluster.totalSearchVolume?.toLocaleString() || 0}</span>
+        <span>🎯 Competition: ${cluster.avgCompetition || 'N/A'}</span>
+        <span>💯 Score: ${cluster.clusterValueScore || 0}</span>
+      </div>
       ${cluster.aiContentStrategy ? `<div class="cluster-strategy">✨ <strong>Content Strategy:</strong> ${cluster.aiContentStrategy}</div>` : ''}
       <div id="cluster-${index}" class="cluster-details" style="display: none;">
         <table class="keywords-table">
