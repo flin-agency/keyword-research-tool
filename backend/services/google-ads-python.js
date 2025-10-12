@@ -3,7 +3,7 @@ const { resolveLanguage } = require('../utils/language');
 
 const MAX_KEYWORDS = parseInt(process.env.MAX_KEYWORDS) || 500;
 const MIN_SEARCH_VOLUME = parseInt(process.env.MIN_SEARCH_VOLUME) || 10;
-const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5000';
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5001';
 
 /**
  * Get keyword metrics from Python microservice

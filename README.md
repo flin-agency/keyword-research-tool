@@ -49,17 +49,12 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 
 5. **Set up environment variables**
 
-   **Main service:**
    ```bash
    cp .env.example .env
    ```
 
-   **Python microservice:**
-   ```bash
-   cp python-ads-service/.env.example python-ads-service/.env
-   ```
-
-   Edit both `.env` files and add your API credentials:
+   The Python microservice reads from the same root `.env`, so you only
+   need to maintain a single environment file with all credentials:
    - **Google Ads API**: Get credentials from [Google Ads API Setup](https://developers.google.com/google-ads/api/docs/first-call/overview)
    - **Gemini API**: Get your key from [Google AI Studio](https://aistudio.google.com/app/apikey)
 
@@ -83,28 +78,30 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 
 ### Main Service (.env)
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `PORT` | Server port (default: 3000) | No |
-| `GOOGLE_ADS_DEVELOPER_TOKEN` | Your Google Ads developer token | Yes* |
-| `GOOGLE_ADS_CLIENT_ID` | OAuth 2.0 client ID | Yes* |
-| `GOOGLE_ADS_CLIENT_SECRET` | OAuth 2.0 client secret | Yes* |
-| `GOOGLE_ADS_REFRESH_TOKEN` | OAuth 2.0 refresh token | Yes* |
-| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | Your Google Ads customer ID | Yes* |
-| `GEMINI_API_KEY` | Gemini AI API key | No** |
-| `MAX_PAGES_TO_SCAN` | Maximum pages to crawl per website (default: 20) | No |
-| `MAX_KEYWORDS` | Maximum keywords to extract (default: 500) | No |
-| `MIN_SEARCH_VOLUME` | Minimum monthly search volume (default: 10) | No |
-| `PYTHON_SERVICE_URL` | Python microservice URL (default: http://localhost:5001) | No |
-| `PYTHON_SERVICE_PORT` | Python service port (default: 5001) | No |
+| Variable | Description | Required | Used by |
+|----------|-------------|----------|---------|
+| `PORT` | Express server port (default: 3000) | No | `backend/server.js` |
+| `NODE_ENV` | Express environment mode | No | `backend/server.js` |
+| `APP_BASE_URL` | Public base URL for OAuth callback generation | No | `backend/api/auth-google.js` |
+| `MAX_REQUEST_SIZE` | Maximum JSON body size (default: 10mb) | No | `backend/server.js` |
+| `CORS_ORIGIN` | Allowed origin for CORS requests | No | `backend/server.js` |
+| `TRUST_PROXY` | Enable proxy headers (set to `true`) | No | `backend/server.js` |
+| `GOOGLE_ADS_DEVELOPER_TOKEN` | Google Ads developer token | Yes* | `python-ads-service/app.py`, `backend/server.js` |
+| `GOOGLE_ADS_CLIENT_ID` | OAuth 2.0 client ID | Yes* | `backend/api/auth-google.js`, `python-ads-service/app.py` |
+| `GOOGLE_ADS_CLIENT_SECRET` | OAuth 2.0 client secret | Yes* | `backend/api/auth-google.js`, `python-ads-service/app.py` |
+| `GOOGLE_ADS_REFRESH_TOKEN` | OAuth 2.0 refresh token (generated post-auth) | Yes* | `backend/api/auth-google.js`, `backend/api/refresh-token.js`, `python-ads-service/app.py` |
+| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | Manager account ID (without dashes) | Yes* | `python-ads-service/app.py` |
+| `GOOGLE_ADS_REDIRECT_URI` | Override OAuth redirect URI | No | `backend/api/auth-google.js` |
+| `GEMINI_API_KEY` | Gemini AI API key | No** | `backend/services/gemini.js`, `backend/services/clustering-improved.js`, `backend/server.js` |
+| `MAX_PAGES_TO_SCAN` | Maximum pages to crawl per domain (default: 20) | No | `backend/services/scraper-unified.js`, `backend/services/scraper.js`, `backend/services/scraper-v2.js` |
+| `SCRAPER_TIMEOUT` | Playwright page timeout in ms (default: 30000) | No | `backend/services/scraper-unified.js` |
+| `MAX_KEYWORDS` | Maximum keywords to enrich (default: 500) | No | `backend/services/google-ads-python.js`, `python-ads-service/app.py` |
+| `MIN_SEARCH_VOLUME` | Minimum monthly search volume (default: 10) | No | `backend/services/google-ads-python.js`, `python-ads-service/app.py` |
+| `PYTHON_SERVICE_URL` | Python microservice URL (default: http://localhost:5001) | No | `backend/services/google-ads-python.js` |
+| `PYTHON_SERVICE_PORT` | Python microservice port (default: 5001) | No | `python-ads-service/app.py` |
+| `CHROME_EXECUTABLE_PATH` | Override Playwright Chrome binary path | No | `backend/services/scraper-unified.js` |
 
-### Python Microservice (python-ads-service/.env)
-
-Same Google Ads API credentials as above, plus:
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `PYTHON_SERVICE_PORT` | Port for Python service (default: 5001) | No |
+> **Usage verification:** Every variable in `.env.example` is consumed by the files listed above, so there are no unused entries in the template.
 
 ## 🏗️ Project Structure
 
@@ -126,8 +123,7 @@ keyword-research-tool/
 │   └── server.js                    # Express server (improved stack)
 ├── python-ads-service/              # Python microservice (Google Ads API v21)
 │   ├── app.py                       # Flask service
-│   ├── requirements.txt             # Python dependencies
-│   └── .env.example                 # Python service env template
+│   └── requirements.txt             # Python dependencies
 ├── frontend/
 │   └── public/
 │       ├── index.html               # Unified UI
