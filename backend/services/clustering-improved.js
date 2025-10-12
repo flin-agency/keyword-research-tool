@@ -1,11 +1,124 @@
-const natural = require('natural');
 const { kmeans } = require('ml-kmeans');
 const { DBSCAN } = require('density-clustering');
 const gemini = require('./gemini');
 
-const TfIdf = natural.TfIdf;
-const tokenizer = new natural.WordTokenizer();
-const stemmer = natural.PorterStemmer;
+let TfIdf;
+let tokenizer;
+let stemmer;
+
+try {
+  const natural = require('natural');
+  TfIdf = natural.TfIdf;
+  tokenizer = new natural.WordTokenizer();
+  stemmer = natural.PorterStemmer;
+} catch (error) {
+  console.warn(
+    '[Clustering] Optional dependency "natural" could not be loaded. Falling back to a simplified NLP toolkit:',
+    error.message
+  );
+  ({ TfIdf, tokenizer, stemmer } = createFallbackNlpToolkit());
+}
+
+function createFallbackNlpToolkit() {
+  class SimpleTokenizer {
+    tokenize(text) {
+      if (!text) {
+        return [];
+      }
+
+      const normalized = text
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]+/giu, ' ');
+
+      return normalized.split(/\s+/u).filter(Boolean);
+    }
+  }
+
+  const simpleStemmer = {
+    stem(word) {
+      if (!word) {
+        return '';
+      }
+
+      let stem = word.toString().toLowerCase();
+
+      const rules = [
+        [/([aeiouy])ies$/, '$1y'],
+        [/([aeiouy])ves$/, '$1f'],
+        [/(?:([bcdfghjklmnpqrstvwxyz]))\1es$/, '$1'],
+        [/([sxz])es$/, '$1'],
+        [/([aeiouy][^aeiouy])ed$/, '$1'],
+        [/([aeiouy][^aeiouy])ing$/, '$1'],
+        [/ment$/, ''],
+        [/ness$/, ''],
+        [/ers?$/, ''],
+        [/ly$/, ''],
+        [/s$/, ''],
+      ];
+
+      for (const [pattern, replacement] of rules) {
+        if (stem.length > 4 && pattern.test(stem)) {
+          stem = stem.replace(pattern, replacement);
+          break;
+        }
+      }
+
+      return stem;
+    },
+  };
+
+  const fallbackTokenizer = new SimpleTokenizer();
+
+  class SimpleTfIdf {
+    constructor() {
+      this.documents = [];
+      this.termDocumentFrequency = new Map();
+    }
+
+    addDocument(text) {
+      const tokens = fallbackTokenizer.tokenize(text);
+      const counts = new Map();
+
+      tokens.forEach(token => {
+        counts.set(token, (counts.get(token) || 0) + 1);
+      });
+
+      this.documents.push({ tokens, counts });
+
+      const uniqueTokens = new Set(tokens);
+      uniqueTokens.forEach(token => {
+        this.termDocumentFrequency.set(token, (this.termDocumentFrequency.get(token) || 0) + 1);
+      });
+    }
+
+    listTerms(docIndex) {
+      const doc = this.documents[docIndex];
+      if (!doc) {
+        return [];
+      }
+
+      const totalTerms = doc.tokens.length || 1;
+      const numDocs = this.documents.length;
+
+      const terms = [];
+      doc.counts.forEach((count, term) => {
+        const termFrequency = count / totalTerms;
+        const docFrequency = this.termDocumentFrequency.get(term) || 1;
+        const inverseDocFrequency = Math.log((numDocs + 1) / (docFrequency + 1)) + 1;
+        terms.push({ term, tfidf: termFrequency * inverseDocFrequency });
+      });
+
+      return terms.sort((a, b) => b.tfidf - a.tfidf);
+    }
+  }
+
+  return {
+    TfIdf: SimpleTfIdf,
+    tokenizer: fallbackTokenizer,
+    stemmer: simpleStemmer,
+  };
+}
 
 // Configuration
 const MIN_CLUSTER_SIZE = 3;

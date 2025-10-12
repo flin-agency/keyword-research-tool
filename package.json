@@ -45,6 +45,7 @@
     "googleapis": "^161.0.0",
     "json2csv": "^6.0.0-alpha.2",
     "ml-kmeans": "^6.0.0",
+    "natural": "^6.10.4",
     "playwright": "^1.55.1",
     "puppeteer": "^24.23.0",
     "uuid": "^9.0.1"
