@@ -1,6 +1,8 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { getLanguageMetadata } = require('../utils/language');
 
+const DEFAULT_RELEVANCE_SCORE = 0.65;
+
 let genAI = null;
 
 function resolveLanguageOptions(languageInput) {
@@ -565,10 +567,21 @@ function recalculateClusterMetrics(cluster) {
 
   const avgCompetition = avgCompetitionValue < 1.5 ? 'low' : avgCompetitionValue < 2.5 ? 'medium' : 'high';
 
-  const volumeScore = Math.min(60, Math.log(avgSearchVolume + 1) * 15);
-  const competitionScore = avgCompetitionValue * 12.5;
-  const sizeBonus = Math.min(15, keywordCount * 1.5);
-  const clusterValueScore = Math.round(Math.min(100, volumeScore + competitionScore + sizeBonus));
+  const totalVolumeScore = Math.min(40, Math.log10(totalSearchVolume + 1) * 20);
+  const avgVolumeScore = Math.min(25, Math.log(avgSearchVolume + 1) * 10);
+  const competitionNormalized = 1 - Math.min(1, Math.max(0, (avgCompetitionValue - 1) / 2));
+  const competitionScore = Math.max(0, Math.min(20, competitionNormalized * 20));
+  const sizeScore = Math.min(10, Math.log1p(keywordCount) * 4);
+
+  const rawRelevance = typeof cluster?.relevanceScore === 'number'
+    ? cluster.relevanceScore
+    : DEFAULT_RELEVANCE_SCORE;
+  const normalizedRelevance = Math.max(0, Math.min(1, rawRelevance || DEFAULT_RELEVANCE_SCORE));
+  const relevanceComponent = normalizedRelevance * 25;
+
+  const clusterValueScore = Math.round(
+    Math.min(100, Math.max(0, totalVolumeScore + avgVolumeScore + competitionScore + sizeScore + relevanceComponent))
+  );
 
   const recalculatedPillar = cluster.pillarTopic && cluster.pillarTopic.trim()
     ? cluster.pillarTopic
@@ -582,6 +595,7 @@ function recalculateClusterMetrics(cluster) {
     totalSearchVolume,
     avgSearchVolume,
     avgCompetition,
+    relevanceScore: Math.round(normalizedRelevance * 100) / 100,
     clusterValueScore,
   };
 }
