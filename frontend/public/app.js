@@ -520,12 +520,7 @@ function displayResults(data) {
       <div
         class="cluster-header"
         data-cluster-index="${index}"
-        role="button"
-        tabindex="0"
-        aria-expanded="false"
         aria-controls="cluster-${index}"
-        onclick="toggleCluster(${index})"
-        onkeypress="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCluster(${index});}"
       >
         <div class="cluster-title-wrap">
           <div class="cluster-title">${cluster.pillarTopic}</div>
@@ -540,6 +535,16 @@ function displayResults(data) {
         <span>💯 Score: ${cluster.clusterValueScore || 0}</span>
       </div>
       ${cluster.aiContentStrategy ? `<div class="cluster-strategy">✨ <strong>Content Strategy:</strong> ${cluster.aiContentStrategy}</div>` : ''}
+      <button
+        type="button"
+        class="cluster-toggle"
+        data-cluster-index="${index}"
+        aria-expanded="false"
+        aria-controls="cluster-${index}"
+        onclick="toggleCluster(${index})"
+      >
+        Show keywords
+      </button>
       <div id="cluster-${index}" class="cluster-details" style="display: none;">
         <table class="keywords-table">
           <thead>
@@ -579,12 +584,17 @@ function displayResults(data) {
 function toggleCluster(index) {
   const content = document.getElementById(`cluster-${index}`);
   const header = document.querySelector(`.cluster-header[data-cluster-index="${index}"]`);
+  const toggleButton = document.querySelector(`.cluster-toggle[data-cluster-index="${index}"]`);
   if (content) {
     const willShow = content.style.display === 'none';
     content.style.display = willShow ? 'block' : 'none';
     if (header) {
       header.setAttribute('aria-expanded', String(willShow));
       header.classList.toggle('is-open', willShow);
+    }
+    if (toggleButton) {
+      toggleButton.setAttribute('aria-expanded', String(willShow));
+      toggleButton.textContent = willShow ? 'Hide keywords' : 'Show keywords';
     }
   }
 }

@@ -565,12 +565,6 @@
       align-items: center;
       gap: 16px;
       margin-bottom: 15px;
-      cursor: pointer;
-    }
-
-    .cluster-header:focus-visible {
-      outline: 3px solid #4338ca;
-      outline-offset: 4px;
     }
 
     .cluster-title-wrap {
@@ -601,12 +595,6 @@
       align-items: center;
       gap: 8px;
       transition: background 0.2s ease, transform 0.2s ease;
-    }
-
-    .cluster-header:hover .cluster-badge,
-    .cluster-header:focus-visible .cluster-badge {
-      background: #312e81;
-      transform: translateY(-1px);
     }
 
     .cluster-badge::after {
@@ -641,6 +629,28 @@
 
     .cluster-strategy {
       margin-top: 16px;
+    }
+
+    .cluster-toggle {
+      margin-top: 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #4338ca;
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      padding: 10px 20px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .cluster-toggle:hover,
+    .cluster-toggle:focus-visible {
+      background: #312e81;
+      transform: translateY(-1px);
+      outline: none;
     }
 
     .keywords-table {
