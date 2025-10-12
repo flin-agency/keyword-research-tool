@@ -1,11 +1,15 @@
-const natural = require('natural');
 const { kmeans } = require('ml-kmeans');
 const { DBSCAN } = require('density-clustering');
 const gemini = require('./gemini');
+const {
+  SimpleTfIdf,
+  tokenizeText,
+  stemWord,
+} = require('../utils/simple-nlp');
 
-const TfIdf = natural.TfIdf;
-const tokenizer = new natural.WordTokenizer();
-const stemmer = natural.PorterStemmer;
+const TfIdf = SimpleTfIdf;
+const tokenizer = { tokenize: tokenizeText };
+const stemmer = { stem: stemWord };
 
 // Configuration
 const MIN_CLUSTER_SIZE = 3;
