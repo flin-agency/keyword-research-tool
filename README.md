@@ -4,21 +4,19 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 
 ## ✨ Features
 
-- **🤖 AI-Powered Keyword Extraction** - Uses Gemini 2.5 to think like a marketer and identify business-relevant keywords
-- **🌍 Multi-Country Support** - Get accurate search volumes for 11 countries (Switzerland, Germany, Austria, France, Italy, UK, US, Canada, Netherlands, Belgium, Spain)
-- **🗣️ Multi-Language Support** - Extract keywords in 11 languages (English, German, French, Italian, Spanish, Dutch, Portuguese, Polish, Russian, Japanese, Chinese)
-- **📊 Real Google Ads Data** - Direct integration with Google Ads Keyword Planner API for accurate search volumes, CPC, and competition data
-- **🎯 Smart Topic Clustering** - ML-based K-Means clustering with AI enhancement to group keywords into actionable topics
-- **📈 High-Volume Prioritization** - Automatically prioritizes keywords and topics with the highest search potential
-- **🕷️ Multi-Strategy Web Scraping** - Robust scraping with Playwright, Axios fallbacks, and demo data
-- **💾 Export Options** - Download results as CSV or JSON
+- **🕷️ Dual-Strategy Web Scraping** – Uses Playwright with an Axios/Cheerio fallback to crawl multiple internal pages per job (default 20, UI cap 100) while handling JavaScript-heavy sites and static pages alike.
+- **🤖 Optional Gemini Keyword Extraction** – If a `GEMINI_API_KEY` is configured the app asks Gemini 2.5 Flash to propose marketing keywords; otherwise it automatically falls back to structured content such as headings.
+- **📊 Google Ads Metrics via Python Microservice** – Keyword ideas are enriched with live Google Ads data by calling the bundled Flask service. Valid Google Ads credentials and the microservice are required for a run to finish.
+- **🎯 Hybrid Topic Clustering** – Keywords are grouped with K-Means/DBSCAN logic and can be refined with Gemini suggestions when AI is available.
+- **💾 CSV & JSON Exports** – Completed jobs can be exported through dedicated endpoints that flatten cluster data for spreadsheets.
+- **🛡️ Built-In Safeguards** – Request validation, per-IP rate limiting, and health/info endpoints are included out of the box.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - **Node.js 18+** and npm
-- **Python 3.10+** (required only when calling the Google Ads API)
+- **Python 3.10+** (needed for the bundled Google Ads microservice; the enrichment step fails without it)
 - Ability to install [Playwright browsers](https://playwright.dev/docs/intro) (`npx playwright install chromium`)
 - Optional but recommended API credentials:
   - Google Ads developer token, OAuth client, refresh token, and login customer ID
@@ -55,16 +53,15 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
    cp .env.example .env
    ```
 
-   The Python microservice reads from the same root `.env`, so you only
-   need to maintain a single environment file with all credentials:
-   - **Google Ads API**: Get credentials from [Google Ads API Setup](https://developers.google.com/google-ads/api/docs/first-call/overview)
-   - **Gemini API**: Get your key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+   Both services read from the root `.env`, so you only need to maintain one set of credentials:
+   - **Google Ads API**: Developer token, OAuth client, refresh token, and login customer ID are all mandatory. The Python service refuses to run without them and the research job will fail.
+   - **Gemini API**: Optional but recommended. Without the key, keyword extraction and cluster naming fall back to deterministic heuristics.
 
 6. **Start the services**
 
    **Terminal 1 – Python microservice (port 5001)**
 
-   Required for live Google Ads data. If you skip this step, the Node.js API automatically falls back to the built-in demo dataset.
+   The Node.js API expects this service to be running and will error if it cannot reach it or if credentials are missing.
 
    ```bash
    cd python-ads-service
@@ -105,13 +102,13 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 
 ### Verify the setup
 
-- `curl http://localhost:3000/health` – check service status and enabled integrations.
-- Submit a URL through the UI to trigger scraping, AI keyword extraction, enrichment, clustering, and exports.
+- `curl http://localhost:3000/health` – confirms the web server is running and reports whether Google Ads/Gemini credentials are configured.
+- Submit a URL through the UI. A successful run requires the scraper, Gemini (optional), the Python microservice, and Google Ads credentials to all be available. Missing Google Ads access causes the job to fail instead of falling back to demo data.
 
 ### Demo vs. production mode
 
-- **Demo mode** (default): Leave Google Ads and Gemini variables empty in `.env`. The pipeline uses realistic mock keyword metrics so you can explore features quickly.
-- **Production mode**: Populate all Google Ads fields and supply a Gemini key for the best results. Restart both services after changing credentials.
+- **Without Gemini**: The app still works but relies on headings/titles for seed keywords and cluster descriptions.
+- **Without Google Ads credentials or the Python service**: Research jobs fail during enrichment because live metrics are mandatory. There is no mock data fallback.
 
 ## 📋 Environment Variables
 
@@ -158,7 +155,7 @@ keyword-research-tool/
 │   │   ├── gemini.js                # Gemini AI helpers
 │   │   └── exporter.js              # CSV/JSON export
 │   ├── utils/
-│   │   └── demo-data.js             # Demo/fallback data
+│   │   └── demo-data.js             # Legacy demo data (not used by the current pipeline)
 │   └── server.js                    # Express server (improved stack)
 ├── python-ads-service/              # Python microservice (Google Ads API v21)
 │   ├── app.py                       # Flask service
@@ -248,7 +245,7 @@ npm test -- --coverage
 
 ## 🌍 Supported Countries & Languages
 
-### Countries (with geo-targeted search volumes)
+### Countries (UI options)
 - 🇨🇭 Switzerland (2756)
 - 🇩🇪 Germany (2276)
 - 🇦🇹 Austria (2040)
@@ -256,13 +253,9 @@ npm test -- --coverage
 - 🇮🇹 Italy (2380)
 - 🇬🇧 United Kingdom (2826)
 - 🇺🇸 United States (2840)
-- 🇨🇦 Canada (2124)
-- 🇳🇱 Netherlands (2528)
-- 🇧🇪 Belgium (2056)
-- 🇪🇸 Spain (2724)
 
 ### Languages
-English, German, French, Italian, Spanish, Dutch, Portuguese, Polish, Russian, Japanese, Chinese
+English, German, French, Italian
 
 ## 📦 Dependencies
 
