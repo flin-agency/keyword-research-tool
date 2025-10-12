@@ -63,7 +63,7 @@ async function extractKeywordsWithAI(scrapedContent, maxKeywords = 150, language
     const ai = initializeGemini();
     if (!ai) return null; // Will fall back to traditional extraction
 
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const { displayName: targetLanguage, primary: primaryLanguage } = buildLanguageContext(languageCode);
 
@@ -130,7 +130,7 @@ async function enhanceClusterWithAI(cluster, websiteContext, languageCode = 'en'
     const ai = initializeGemini();
     if (!ai) return cluster; // Return unchanged if no API key
 
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const { displayName: languageName, primary: primaryLanguage } = buildLanguageContext(languageCode);
 
@@ -199,7 +199,7 @@ async function analyzeAndRegroupClusters(clusters, websiteContext, allKeywords, 
     const ai = initializeGemini();
     if (!ai) return clusters; // Return unchanged if no API key
 
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const { displayName: languageName, primary: primaryLanguage } = buildLanguageContext(languageCode);
 
@@ -284,7 +284,7 @@ async function scrutinizeClusterTopics(clusters, allKeywords = [], websiteContex
       return clusters;
     }
 
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const { displayName: languageName, primary: primaryLanguage } = buildLanguageContext(languageInput);
 
     const duplicateHints = buildDuplicateHints(clusters);
@@ -424,7 +424,7 @@ async function generateContentBrief(cluster, websiteContext, languageCode = 'en'
     const ai = initializeGemini();
     if (!ai) return null;
 
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const { displayName: languageName, primary: primaryLanguage } = buildLanguageContext(languageCode);
 
