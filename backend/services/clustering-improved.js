@@ -1,11 +1,124 @@
-const natural = require('natural');
 const { kmeans } = require('ml-kmeans');
 const { DBSCAN } = require('density-clustering');
 const gemini = require('./gemini');
 
-const TfIdf = natural.TfIdf;
-const tokenizer = new natural.WordTokenizer();
-const stemmer = natural.PorterStemmer;
+let TfIdf;
+let tokenizer;
+let stemmer;
+
+try {
+  const natural = require('natural');
+  TfIdf = natural.TfIdf;
+  tokenizer = new natural.WordTokenizer();
+  stemmer = natural.PorterStemmer;
+} catch (error) {
+  console.warn(
+    '[Clustering] Optional dependency "natural" could not be loaded. Falling back to a simplified NLP toolkit:',
+    error.message
+  );
+  ({ TfIdf, tokenizer, stemmer } = createFallbackNlpToolkit());
+}
+
+function createFallbackNlpToolkit() {
+  class SimpleTokenizer {
+    tokenize(text) {
+      if (!text) {
+        return [];
+      }
+
+      const normalized = text
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]+/giu, ' ');
+
+      return normalized.split(/\s+/u).filter(Boolean);
+    }
+  }
+
+  const simpleStemmer = {
+    stem(word) {
+      if (!word) {
+        return '';
+      }
+
+      let stem = word.toString().toLowerCase();
+
+      const rules = [
+        [/([aeiouy])ies$/, '$1y'],
+        [/([aeiouy])ves$/, '$1f'],
+        [/(?:([bcdfghjklmnpqrstvwxyz]))\1es$/, '$1'],
+        [/([sxz])es$/, '$1'],
+        [/([aeiouy][^aeiouy])ed$/, '$1'],
+        [/([aeiouy][^aeiouy])ing$/, '$1'],
+        [/ment$/, ''],
+        [/ness$/, ''],
+        [/ers?$/, ''],
+        [/ly$/, ''],
+        [/s$/, ''],
+      ];
+
+      for (const [pattern, replacement] of rules) {
+        if (stem.length > 4 && pattern.test(stem)) {
+          stem = stem.replace(pattern, replacement);
+          break;
+        }
+      }
+
+      return stem;
+    },
+  };
+
+  const fallbackTokenizer = new SimpleTokenizer();
+
+  class SimpleTfIdf {
+    constructor() {
+      this.documents = [];
+      this.termDocumentFrequency = new Map();
+    }
+
+    addDocument(text) {
+      const tokens = fallbackTokenizer.tokenize(text);
+      const counts = new Map();
+
+      tokens.forEach(token => {
+        counts.set(token, (counts.get(token) || 0) + 1);
+      });
+
+      this.documents.push({ tokens, counts });
+
+      const uniqueTokens = new Set(tokens);
+      uniqueTokens.forEach(token => {
+        this.termDocumentFrequency.set(token, (this.termDocumentFrequency.get(token) || 0) + 1);
+      });
+    }
+
+    listTerms(docIndex) {
+      const doc = this.documents[docIndex];
+      if (!doc) {
+        return [];
+      }
+
+      const totalTerms = doc.tokens.length || 1;
+      const numDocs = this.documents.length;
+
+      const terms = [];
+      doc.counts.forEach((count, term) => {
+        const termFrequency = count / totalTerms;
+        const docFrequency = this.termDocumentFrequency.get(term) || 1;
+        const inverseDocFrequency = Math.log((numDocs + 1) / (docFrequency + 1)) + 1;
+        terms.push({ term, tfidf: termFrequency * inverseDocFrequency });
+      });
+
+      return terms.sort((a, b) => b.tfidf - a.tfidf);
+    }
+  }
+
+  return {
+    TfIdf: SimpleTfIdf,
+    tokenizer: fallbackTokenizer,
+    stemmer: simpleStemmer,
+  };
+}
 
 // Configuration
 const MIN_CLUSTER_SIZE = 3;
@@ -142,7 +255,10 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
     }
 
     // Final safety pass to guarantee keyword uniqueness
-    return ensureUniqueKeywords(clusters);
+    clusters = ensureUniqueKeywords(clusters);
+
+    // Ensure every cluster ships with human-readable insights even without AI
+    return applyClusterNarratives(clusters, websiteContext);
 
   } catch (error) {
     console.error('[Clustering] Error:', error);
@@ -706,9 +822,28 @@ function ensureUniqueKeywords(clusters) {
     if (!cluster) return;
 
     if (cluster.keywords.length >= MIN_CLUSTER_SIZE) {
-      resultClusters.push(
-        createClusterObject(resultClusters.length + 1, cluster.keywords, cluster.algorithm || 'hybrid')
+      const baseCluster = createClusterObject(
+        resultClusters.length + 1,
+        cluster.keywords,
+        cluster.algorithm || 'hybrid'
       );
+
+      const mergedCluster = {
+        ...baseCluster,
+        pillarTopic: cluster.pillarTopic || baseCluster.pillarTopic,
+      };
+
+      Object.keys(cluster || {})
+        .filter(key => key.startsWith('ai') && typeof cluster[key] === 'string' && cluster[key].trim())
+        .forEach(key => {
+          mergedCluster[key] = cluster[key];
+        });
+
+      if (cluster.aiEnhanced) {
+        mergedCluster.aiEnhanced = cluster.aiEnhanced;
+      }
+
+      resultClusters.push(mergedCluster);
     } else {
       orphanKeywords.push(...cluster.keywords);
     }
@@ -727,6 +862,133 @@ function ensureUniqueKeywords(clusters) {
   }
 
   return resultClusters;
+}
+
+function extractTopKeywordPhrases(cluster, limit = 5) {
+  if (!cluster || !Array.isArray(cluster.keywords)) {
+    return [];
+  }
+
+  return cluster.keywords
+    .map(keyword => (typeof keyword?.keyword === 'string' ? keyword.keyword.trim() : ''))
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function formatKeywordList(keywords) {
+  const unique = Array.from(new Set(keywords.filter(Boolean)));
+
+  if (unique.length === 0) {
+    return '';
+  }
+
+  if (unique.length === 1) {
+    return unique[0];
+  }
+
+  if (unique.length === 2) {
+    return `${unique[0]} and ${unique[1]}`;
+  }
+
+  const initial = unique.slice(0, -1).join(', ');
+  return `${initial}, and ${unique[unique.length - 1]}`;
+}
+
+function summarizeWebsiteContext(websiteContext = {}) {
+  const { title, description, url } = websiteContext || {};
+  const candidates = [title, description, url]
+    .map(value => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
+
+  if (candidates.length === 0) {
+    return '';
+  }
+
+  const summary = candidates[0];
+  return summary.length > 140 ? `${summary.slice(0, 137)}...` : summary;
+}
+
+function buildFallbackClusterDescription(cluster, websiteContext = {}) {
+  const baseTopic = typeof cluster?.pillarTopic === 'string' && cluster.pillarTopic.trim()
+    ? cluster.pillarTopic.trim()
+    : 'this topic';
+
+  const topKeywords = extractTopKeywordPhrases(cluster, 4);
+  const primaryKeyword = topKeywords[0] || baseTopic;
+  const supportingKeywords = topKeywords
+    .slice(1)
+    .filter(keyword => keyword.toLowerCase() !== primaryKeyword.toLowerCase());
+
+  let description = `This cluster groups searches about ${primaryKeyword}.`;
+  const supportingText = formatKeywordList(supportingKeywords);
+
+  if (supportingText) {
+    description += ` Related queries include ${supportingText}.`;
+  }
+
+  const siteSummary = summarizeWebsiteContext(websiteContext);
+  if (siteSummary) {
+    description += ` Align your coverage with what people expect from ${siteSummary}.`;
+  } else {
+    description += ' Emphasize clear explanations and practical examples to satisfy search intent.';
+  }
+
+  return description;
+}
+
+function buildFallbackClusterStrategy(cluster, websiteContext = {}) {
+  const baseTopic = typeof cluster?.pillarTopic === 'string' && cluster.pillarTopic.trim()
+    ? cluster.pillarTopic.trim()
+    : 'the main topic';
+
+  const topKeywords = extractTopKeywordPhrases(cluster, 5);
+  const primaryKeyword = topKeywords[0] || baseTopic;
+  const supportingKeywords = topKeywords
+    .slice(1, 4)
+    .filter(keyword => keyword.toLowerCase() !== primaryKeyword.toLowerCase());
+
+  const supportingText = formatKeywordList(supportingKeywords);
+
+  const strategyParts = [
+    `Create an authoritative piece focused on ${primaryKeyword}.`,
+  ];
+
+  if (supportingText) {
+    strategyParts.push(`Structure the content to answer related searches like ${supportingText}.`);
+  }
+
+  const siteSummary = summarizeWebsiteContext(websiteContext);
+  if (siteSummary) {
+    strategyParts.push(`Demonstrate how ${siteSummary} solves the reader's problem and include proof of expertise.`);
+  } else {
+    strategyParts.push('Incorporate real examples, data, or case studies from your brand to build authority.');
+  }
+
+  return strategyParts.join(' ');
+}
+
+function applyClusterNarratives(clusters, websiteContext = {}) {
+  if (!Array.isArray(clusters)) {
+    return [];
+  }
+
+  return clusters.map(cluster => {
+    if (!cluster) {
+      return cluster;
+    }
+
+    const enrichedCluster = { ...cluster };
+
+    if (!enrichedCluster.aiDescription || !enrichedCluster.aiDescription.trim()) {
+      enrichedCluster.aiDescription = buildFallbackClusterDescription(enrichedCluster, websiteContext);
+    }
+
+    if (!enrichedCluster.aiContentStrategy || !enrichedCluster.aiContentStrategy.trim()) {
+      enrichedCluster.aiContentStrategy = buildFallbackClusterStrategy(enrichedCluster, websiteContext);
+    }
+
+    return enrichedCluster;
+  });
 }
 
 /**

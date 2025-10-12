@@ -19,6 +19,8 @@ const elements = {
   results: document.getElementById('results'),
   summary: document.getElementById('summary'),
   clusters: document.getElementById('clusters'),
+  contentUrls: document.getElementById('contentUrls'),
+  crawledUrlsToggle: document.getElementById('crawledUrlsToggle'),
   exportCsv: document.getElementById('exportCsv'),
   exportJson: document.getElementById('exportJson'),
   apiWarning: document.getElementById('apiWarning'),
@@ -27,6 +29,17 @@ const elements = {
   connectGoogleBtn: document.getElementById('connectGoogleBtn'),
   refreshStatusBtn: document.getElementById('refreshStatusBtn'),
 };
+
+const textEscaper = typeof document !== 'undefined' ? document.createElement('div') : null;
+
+function escapeHtml(value) {
+  if (!textEscaper) {
+    return typeof value === 'string' ? value : '';
+  }
+
+  textEscaper.textContent = typeof value === 'string' ? value : '';
+  return textEscaper.innerHTML;
+}
 
 function getSelectedLanguageLabel() {
   const { languageSelect } = elements;
@@ -350,6 +363,46 @@ function displayResults(data) {
     </div>
   `;
 
+  if (elements.contentUrls) {
+    if (elements.crawledUrlsToggle) {
+      elements.crawledUrlsToggle.setAttribute('aria-expanded', 'false');
+      elements.crawledUrlsToggle.classList.remove('is-open');
+    }
+
+    const urlsSource = Array.isArray(data.crawledUrls) && data.crawledUrls.length > 0
+      ? data.crawledUrls
+      : (data.scrapedContent?.pages || []).map((page) => page?.url).filter((url) => typeof url === 'string' && url.trim());
+
+    if (!urlsSource || urlsSource.length === 0) {
+      elements.contentUrls.innerHTML = '<li class="empty-state">No URLs collected.</li>';
+    } else {
+      elements.contentUrls.innerHTML = urlsSource
+        .map((url, index) => {
+          const safeLabel = escapeHtml(url);
+          const safeHref = typeof url === 'string' ? encodeURI(url) : '#';
+          return `
+            <li class="url-item">
+              <span class="url-index">${index + 1}.</span>
+              <a href="${safeHref}" target="_blank" rel="noopener noreferrer">${safeLabel}</a>
+            </li>
+          `;
+        })
+        .join('');
+    }
+
+    elements.contentUrls.classList.add('is-collapsed');
+    elements.contentUrls.hidden = true;
+
+    if (elements.crawledUrlsToggle) {
+      const baseLabel = elements.crawledUrlsToggle.dataset?.label || 'Crawled URLs';
+      const labelNode = elements.crawledUrlsToggle.querySelector('.toggle-label');
+      if (labelNode) {
+        const count = urlsSource?.length || 0;
+        labelNode.textContent = `${baseLabel} (${count})`;
+      }
+    }
+  }
+
   elements.clusters.innerHTML = '';
   (data.clusters || []).forEach((cluster, index) => {
     const clusterDiv = document.createElement('div');
@@ -406,6 +459,20 @@ function toggleCluster(index) {
   const content = document.getElementById(`cluster-${index}`);
   if (content) {
     content.style.display = content.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+function toggleCrawledUrls() {
+  if (!elements.contentUrls) {
+    return;
+  }
+
+  const isCollapsed = elements.contentUrls.classList.toggle('is-collapsed');
+  elements.contentUrls.hidden = isCollapsed;
+
+  if (elements.crawledUrlsToggle) {
+    elements.crawledUrlsToggle.setAttribute('aria-expanded', String(!isCollapsed));
+    elements.crawledUrlsToggle.classList.toggle('is-open', !isCollapsed);
   }
 }
 
@@ -497,9 +564,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (elements.crawledUrlsToggle) {
+    elements.crawledUrlsToggle.addEventListener('click', toggleCrawledUrls);
+  }
+
   updateProgress(0, 'Ready');
   handleRedirectMessages();
   initializeIntegrations();
 });
 
 window.toggleCluster = toggleCluster;
+window.toggleCrawledUrls = toggleCrawledUrls;

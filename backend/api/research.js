@@ -119,6 +119,35 @@ async function generateSeedKeywords(scrapedContent, languageCode) {
   return buildFallbackKeywords(scrapedContent);
 }
 
+function buildContentSummary(scrapedContent = {}, clusters = []) {
+  const pages = Array.isArray(scrapedContent.pages) ? scrapedContent.pages : [];
+  const firstPageWithDescription = pages.find(
+    (page) => page && typeof page.metaDescription === 'string' && page.metaDescription.trim().length > 0
+  );
+  const primaryPage = firstPageWithDescription || pages[0] || {};
+
+  const description =
+    (typeof primaryPage.metaDescription === 'string' && primaryPage.metaDescription.trim()) ||
+    (typeof primaryPage.title === 'string' && primaryPage.title.trim()) ||
+    '';
+
+  const strategyItems = Array.isArray(clusters)
+    ? clusters
+        .filter((cluster) => cluster && typeof cluster.aiContentStrategy === 'string' && cluster.aiContentStrategy.trim())
+        .slice(0, 10)
+        .map((cluster) => ({
+          pillarTopic: cluster.pillarTopic,
+          strategy: cluster.aiContentStrategy,
+        }))
+    : [];
+
+  return {
+    title: typeof primaryPage.title === 'string' ? primaryPage.title : '',
+    description,
+    strategies: strategyItems,
+  };
+}
+
 /**
  * POST /api/research
  * Start a new keyword research job
@@ -420,6 +449,13 @@ async function processResearch(jobId, url, country = '2756', language = null, op
         clusters.reduce((sum, c) => sum + c.totalSearchVolume, 0) / keywordData.length
       ),
       clusters: clusters.slice(0, 50), // Limit to top 50 clusters
+      crawledUrls: Array.from(
+        new Set(
+          (Array.isArray(content.pages) ? content.pages : [])
+            .map((page) => page && page.url)
+            .filter((url) => typeof url === 'string' && url.trim().length > 0)
+        )
+      ),
       summary: {
         pagesScraped: content.pages.length,
         wordsAnalyzed: content.totalWords,
@@ -431,7 +467,9 @@ async function processResearch(jobId, url, country = '2756', language = null, op
       scrapedContent: {
         pages: content.pages.slice(0, 10), // Limit stored pages
         totalWords: content.totalWords,
-      },    };
+      },
+      contentSummary: buildContentSummary(content, clusters),
+    };
 
     // Log AI content in final data
     console.log(`[${jobId}] Checking AI content in finalData.clusters:`);

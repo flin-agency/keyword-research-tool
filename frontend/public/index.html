@@ -389,6 +389,110 @@
       margin-bottom: 30px;
     }
 
+    .content-insights {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      margin-top: 20px;
+    }
+
+    .content-section {
+      background: #f8f9ff;
+      border: 1px solid #e0e7ff;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .content-section.collapsible {
+      gap: 16px;
+    }
+
+    .content-section h3 {
+      font-size: 1.05rem;
+      color: #4338ca;
+    }
+
+    .collapsible-heading {
+      margin: 0;
+    }
+
+    .collapsible-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 12px;
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: #4338ca;
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .collapsible-trigger:focus-visible {
+      outline: 2px solid #6366f1;
+      outline-offset: 4px;
+    }
+
+    .collapsible-trigger .chevron {
+      font-size: 1.1rem;
+      transition: transform 0.2s ease;
+    }
+
+    .collapsible-trigger.is-open .chevron {
+      transform: rotate(180deg);
+    }
+
+    .url-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: block;
+    }
+
+    .url-list.is-collapsed {
+      display: none !important;
+    }
+
+    .url-item {
+      display: block;
+      margin-bottom: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #ede9fe;
+    }
+
+    .url-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .url-index {
+      font-weight: 600;
+      color: #3730a3;
+      margin-right: 8px;
+    }
+
+    .url-item a {
+      color: #4c1d95;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .url-item a:hover,
+    .url-item a:focus {
+      text-decoration: underline;
+    }
+
+    .empty-state {
+      color: #6b7280;
+      font-style: italic;
+    }
+
     .stat-card {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
@@ -638,6 +742,30 @@
         <div class="export-buttons">
           <button class="btn" id="exportCsv">Export CSV</button>
           <button class="btn" id="exportJson">Export JSON</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Crawled URLs</h2>
+        <div class="content-insights">
+          <div class="content-section collapsible">
+            <h3 class="collapsible-heading">
+              <button
+                type="button"
+                id="crawledUrlsToggle"
+                class="collapsible-trigger"
+                aria-expanded="false"
+                aria-controls="contentUrls"
+                data-label="Crawled URLs"
+              >
+                <span class="toggle-label">Crawled URLs</span>
+                <span class="chevron" aria-hidden="true">▾</span>
+              </button>
+            </h3>
+            <ul id="contentUrls" class="url-list is-collapsed" hidden>
+              <li class="empty-state">No URLs collected.</li>
+            </ul>
+          </div>
         </div>
       </div>
 
