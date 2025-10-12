@@ -241,6 +241,6 @@ def test_credentials():
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.getenv('PYTHON_SERVICE_PORT', 5000))
+    port = int(os.getenv('PYTHON_SERVICE_PORT', 5001))
     print(f"[Python Service] Starting on port {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
