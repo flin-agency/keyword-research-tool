@@ -68,7 +68,7 @@ This is a keyword research tool that scans websites, queries Google Ads Keyword 
 ├── backend/
 │   ├── api/
 │   ├── services/
-│   │   ├── scraper.js/py
+│   │   ├── scraper-unified.js/py
 │   │   ├── gemini.js/py
 │   │   ├── google-ads.js/py
 │   │   └── clustering-improved.js/py

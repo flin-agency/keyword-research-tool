@@ -1,6 +1,6 @@
-const scraper = require('../backend/services/scraper');
+const scraper = require('../backend/services/scraper-unified');
 
-describe('Scraper Module', () => {
+describe('Unified Scraper Module', () => {
   describe('extractContentFromHTML', () => {
     test('should extract title from HTML', () => {
       const html = '<html><head><title>Test Page</title></head><body></body></html>';
@@ -80,12 +80,13 @@ describe('Scraper Module', () => {
           <head><style>.test { color: red; }</style></head>
           <body>
             <script>console.log('test');</script>
-            <p>Visible content here with more words to pass filter</p>
+            <p>Visible content here with more words to pass this scraper filter reliably today</p>
           </body>
         </html>
       `;
       const result = scraper.extractContentFromHTML(html, 'http://test.com');
 
+      expect(result.paragraphs.length).toBeGreaterThan(0);
       expect(result.paragraphs[0]).toContain('Visible content here');
     });
   });
