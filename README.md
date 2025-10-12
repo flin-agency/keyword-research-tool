@@ -17,10 +17,12 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 
 ### Prerequisites
 
-- Node.js 16+ installed
-- Python 3.8+ installed
-- Google Ads API credentials (optional - works with mock data otherwise)
-- Gemini API key (optional - falls back to traditional NLP)
+- **Node.js 18+** and npm
+- **Python 3.10+** (required only when calling the Google Ads API)
+- Ability to install [Playwright browsers](https://playwright.dev/docs/intro) (`npx playwright install chromium`)
+- Optional but recommended API credentials:
+  - Google Ads developer token, OAuth client, refresh token, and login customer ID
+  - Gemini API key for AI-assisted keyword extraction
 
 ### Installation
 
@@ -35,16 +37,16 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
    npm install
    ```
 
-3. **Install Python dependencies** (for Google Ads API v21)
+3. **Install Playwright browsers** (Chromium is sufficient for scraping)
+   ```bash
+   npx playwright install chromium
+   ```
+
+4. **Install Python dependencies** (for Google Ads API v21)
    ```bash
    cd python-ads-service
    pip3 install -r requirements.txt
    cd ..
-   ```
-
-4. **Install Playwright browsers** (for web scraping)
-   ```bash
-   npx playwright install
    ```
 
 5. **Set up environment variables**
@@ -58,21 +60,37 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
    - **Google Ads API**: Get credentials from [Google Ads API Setup](https://developers.google.com/google-ads/api/docs/first-call/overview)
    - **Gemini API**: Get your key from [Google AI Studio](https://aistudio.google.com/app/apikey)
 
-6. **Start both services**
+6. **Start the services**
 
-   **Terminal 1 - Python microservice (port 5001):**
+   **Terminal 1 – Python microservice (port 5001)**
+
+   Required for live Google Ads data. If you skip this step, the Node.js API automatically falls back to the built-in demo dataset.
+
    ```bash
    cd python-ads-service
    PYTHON_SERVICE_PORT=5001 python3 app.py
    ```
 
-   **Terminal 2 - Node.js server (port 3000):**
+   **Terminal 2 – Node.js server (port 3000)**
+
    ```bash
+   cd keyword-research-tool
    npm start
    ```
 
-7. **Open your browser**
-   Navigate to `http://localhost:3000`
+7. **Open the app**
+
+   Visit `http://localhost:3000` once the console logs show `Ready at http://localhost:3000`.
+
+### Verify the setup
+
+- `curl http://localhost:3000/health` – check service status and enabled integrations.
+- Submit a URL through the UI to trigger scraping, AI keyword extraction, enrichment, clustering, and exports.
+
+### Demo vs. production mode
+
+- **Demo mode** (default): Leave Google Ads and Gemini variables empty in `.env`. The pipeline uses realistic mock keyword metrics so you can explore features quickly.
+- **Production mode**: Populate all Google Ads fields and supply a Gemini key for the best results. Restart both services after changing credentials.
 
 ## 📋 Environment Variables
 

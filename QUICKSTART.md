@@ -1,82 +1,83 @@
-# Quick Start Guide
+# Quick Start Guide (Latest Stack)
 
-Get up and running in 60 seconds!
+Spin up the improved keyword research pipeline end-to-end.
 
-## 1. Start the Server
+## 1. Requirements
+
+- **Node.js 18+** and npm
+- **Python 3.10+** (needed for live Google Ads data)
+- Ability to install [Playwright browsers](https://playwright.dev/docs/intro)
+- Optional API keys:
+  - Google Ads developer credentials
+  - Gemini API key
+
+> ⚠️ No credentials? The app still works with high-quality demo data, so you can explore the workflow without provisioning APIs.
+
+## 2. Install Dependencies
 
 ```bash
+git clone https://github.com/flin-agency/keyword-research-tool.git
+cd keyword-research-tool
+
+# Node.js dependencies
+npm install
+
+# Playwright browser binaries (Chromium is enough)
+npx playwright install chromium
+
+# Python microservice dependencies
+cd python-ads-service
+pip3 install -r requirements.txt
+cd ..
+```
+
+## 3. Configure the Environment
+
+```bash
+cp .env.example .env
+```
+
+Fill in the `.env` file with any API credentials you have available. The same file powers both the Node.js server and the Python microservice, so you only need to maintain it once.
+
+Minimum configuration for a demo run:
+- Keep Google Ads + Gemini variables empty to use realistic mock data.
+- Optionally tweak crawling limits like `MAX_PAGES_TO_SCAN` or `MAX_KEYWORDS`.
+
+## 4. Start the Services
+
+Run the Python helper (only required for real Google Ads lookups):
+
+```bash
+cd python-ads-service
+PYTHON_SERVICE_PORT=5001 python3 app.py
+```
+
+Then launch the Node.js server in a second terminal:
+
+```bash
+cd keyword-research-tool
 npm start
 ```
 
-You should see:
-```
-Server running on port 3000
-```
+When the logs show `Ready at http://localhost:3000`, open that URL in your browser.
 
-## 2. Open the Web Interface
+## 5. Run a Research Job
 
-Open your browser to: **http://localhost:3000**
+1. Enter any website URL (e.g. `https://flin.agency/`).
+2. Choose the target country and language.
+3. Click **Start Research**.
+4. Watch the live progress as the system scrapes, extracts AI keywords, enriches Google Ads metrics, and builds topic clusters.
+5. Expand cluster cards to explore keywords and export them as CSV or JSON.
 
-## 3. Try It Out
+## 6. Health Check & Troubleshooting
 
-1. Enter a website URL in the input field:
-   - `github.com`
-   - `stackoverflow.com`
-   - `reddit.com`
-   - Any website you want to analyze
+- **Server health:** `curl http://localhost:3000/health`
+- **Playwright missing?** Re-run `npx playwright install chromium`.
+- **Port busy?** Stop other services or change `PORT` in `.env`.
+- **Skipping Google Ads service?** Just leave the Python helper stopped—the Node.js API will automatically fall back to demo metrics.
 
-2. Click **"Start Research"**
-
-3. Watch the progress bar as it:
-   - Scans the website (0-40%)
-   - Extracts keywords (40-50%)
-   - Queries keyword data (50-80%)
-   - Builds topic clusters (80-100%)
-
-4. View your results:
-   - Summary statistics at the top
-   - Topic clusters ranked by value
-   - Click cluster headers to expand/collapse
-   - Keywords with search volume, competition, and CPC
-
-5. Export results:
-   - Click **"Export CSV"** for spreadsheet
-   - Click **"Export JSON"** for raw data
-
-## Expected Results
-
-- **Total Keywords**: 200-500
-- **Topic Clusters**: 5-15
-- **Processing Time**: 1-2 minutes
-
-## Note About Google Ads API
-
-This tool works **without** Google Ads API credentials by using realistic mock data.
-
-To use real Google Ads data:
-1. Set up Google Ads API credentials (see README.md)
-2. Add credentials to `.env` file
-3. Restart the server
-
-## Troubleshooting
-
-### Server won't start
-```bash
-# Kill any process using port 3000
-lsof -ti:3000 | xargs kill -9
-
-# Try again
-npm start
-```
-
-### Website scraping fails
-- Try a different website
-- Some websites block automated scraping
-- The tool will still work, it just needs an accessible website
-
-### Need help?
-Check the full **README.md** for detailed documentation.
+For advanced configuration, testing, and API details, read the full [README.md](README.md).
 
 ---
 
-**That's it! You're ready to discover keyword opportunities.** 🚀
+**Happy researching! 🚀**
