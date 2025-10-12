@@ -389,6 +389,83 @@
       margin-bottom: 30px;
     }
 
+    .content-insights {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      margin-top: 20px;
+    }
+
+    .content-section {
+      background: #f8f9ff;
+      border: 1px solid #e0e7ff;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .content-section h3 {
+      font-size: 1.05rem;
+      color: #4338ca;
+    }
+
+    .content-text {
+      color: #4b5563;
+      line-height: 1.6;
+    }
+
+    .strategy-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .strategy-item {
+      padding: 12px;
+      border-radius: 10px;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+    }
+
+    .strategy-item strong {
+      display: block;
+      color: #312e81;
+      margin-bottom: 6px;
+    }
+
+    .url-list {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 0;
+      margin: 0;
+    }
+
+    .url-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #ede9fe;
+      color: #4c1d95;
+      font-size: 0.9rem;
+      word-break: break-word;
+    }
+
+    .url-pill span {
+      font-weight: 600;
+      color: #3730a3;
+    }
+
+    .empty-state {
+      color: #6b7280;
+      font-style: italic;
+    }
+
     .stat-card {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
@@ -638,6 +715,28 @@
         <div class="export-buttons">
           <button class="btn" id="exportCsv">Export CSV</button>
           <button class="btn" id="exportJson">Export JSON</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Content Insights</h2>
+        <div class="content-insights">
+          <div class="content-section">
+            <h3>Content Description</h3>
+            <p id="contentDescription" class="content-text empty-state">No description available yet.</p>
+          </div>
+          <div class="content-section">
+            <h3>Content Strategy</h3>
+            <div id="contentStrategy" class="strategy-list">
+              <p class="empty-state">No strategy recommendations available yet.</p>
+            </div>
+          </div>
+          <div class="content-section">
+            <h3>Crawled URLs</h3>
+            <ul id="contentUrls" class="url-list">
+              <li class="empty-state">No URLs collected.</li>
+            </ul>
+          </div>
         </div>
       </div>
 

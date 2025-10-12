@@ -19,6 +19,9 @@ const elements = {
   results: document.getElementById('results'),
   summary: document.getElementById('summary'),
   clusters: document.getElementById('clusters'),
+  contentDescription: document.getElementById('contentDescription'),
+  contentStrategy: document.getElementById('contentStrategy'),
+  contentUrls: document.getElementById('contentUrls'),
   exportCsv: document.getElementById('exportCsv'),
   exportJson: document.getElementById('exportJson'),
   apiWarning: document.getElementById('apiWarning'),
@@ -27,6 +30,17 @@ const elements = {
   connectGoogleBtn: document.getElementById('connectGoogleBtn'),
   refreshStatusBtn: document.getElementById('refreshStatusBtn'),
 };
+
+const textEscaper = typeof document !== 'undefined' ? document.createElement('div') : null;
+
+function escapeHtml(value) {
+  if (!textEscaper) {
+    return typeof value === 'string' ? value : '';
+  }
+
+  textEscaper.textContent = typeof value === 'string' ? value : '';
+  return textEscaper.innerHTML;
+}
 
 function getSelectedLanguageLabel() {
   const { languageSelect } = elements;
@@ -349,6 +363,66 @@ function displayResults(data) {
       <div class="label">Target Market</div>
     </div>
   `;
+
+  const contentSummary = data.contentSummary || {};
+  if (elements.contentDescription) {
+    const fallbackPages = Array.isArray(data.scrapedContent?.pages) ? data.scrapedContent.pages : [];
+    const fallbackDescriptionPage = fallbackPages.find(
+      (page) => page && typeof page.metaDescription === 'string' && page.metaDescription.trim()
+    );
+    const descriptionText =
+      contentSummary.description ||
+      fallbackDescriptionPage?.metaDescription ||
+      fallbackPages[0]?.title ||
+      '';
+
+    if (descriptionText) {
+      elements.contentDescription.textContent = descriptionText;
+      elements.contentDescription.classList.remove('empty-state');
+    } else {
+      elements.contentDescription.textContent = 'No description available yet.';
+      elements.contentDescription.classList.add('empty-state');
+    }
+  }
+
+  if (elements.contentStrategy) {
+    const strategyItems = Array.isArray(contentSummary.strategies) && contentSummary.strategies.length > 0
+      ? contentSummary.strategies
+      : (data.clusters || [])
+          .filter((cluster) => cluster && typeof cluster.aiContentStrategy === 'string' && cluster.aiContentStrategy.trim())
+          .slice(0, 10)
+          .map((cluster) => ({
+            pillarTopic: cluster.pillarTopic,
+            strategy: cluster.aiContentStrategy,
+          }));
+
+    if (!strategyItems || strategyItems.length === 0) {
+      elements.contentStrategy.innerHTML = '<p class="empty-state">No strategy recommendations available yet.</p>';
+    } else {
+      elements.contentStrategy.innerHTML = strategyItems
+        .map((item) => `
+          <div class="strategy-item">
+            <strong>${escapeHtml(item.pillarTopic || 'Content Theme')}</strong>
+            <span>${escapeHtml(item.strategy)}</span>
+          </div>
+        `)
+        .join('');
+    }
+  }
+
+  if (elements.contentUrls) {
+    const urlsSource = Array.isArray(data.crawledUrls) && data.crawledUrls.length > 0
+      ? data.crawledUrls
+      : (data.scrapedContent?.pages || []).map((page) => page?.url).filter((url) => typeof url === 'string' && url.trim());
+
+    if (!urlsSource || urlsSource.length === 0) {
+      elements.contentUrls.innerHTML = '<li class="empty-state">No URLs collected.</li>';
+    } else {
+      elements.contentUrls.innerHTML = urlsSource
+        .map((url, index) => `<li class="url-pill"><span>${index + 1}.</span>${escapeHtml(url)}</li>`)
+        .join('');
+    }
+  }
 
   elements.clusters.innerHTML = '';
   (data.clusters || []).forEach((cluster, index) => {
