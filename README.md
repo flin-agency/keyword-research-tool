@@ -4,7 +4,7 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 
 ## ✨ Features
 
-- **🤖 AI-Powered Keyword Extraction** - Uses Gemini 2.0 to think like a marketer and identify business-relevant keywords
+- **🤖 AI-Powered Keyword Extraction** - Uses Gemini 2.5 to think like a marketer and identify business-relevant keywords
 - **🌍 Multi-Country Support** - Get accurate search volumes for 11 countries (Switzerland, Germany, Austria, France, Italy, UK, US, Canada, Netherlands, Belgium, Spain)
 - **🗣️ Multi-Language Support** - Extract keywords in 11 languages (English, German, French, Italian, Spanish, Dutch, Portuguese, Polish, Russian, Japanese, Chinese)
 - **📊 Real Google Ads Data** - Direct integration with Google Ads Keyword Planner API for accurate search volumes, CPC, and competition data
