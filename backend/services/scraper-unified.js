@@ -98,16 +98,7 @@ async function scrapeWithPlaywright(url, options = {}) {
     // Launch browser with optimized settings
     const launchOptions = {
       headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process', // Might be useful for some environments
-        '--disable-gpu'
-      ],
+      args: buildChromiumLaunchArgs(),
     };
 
     // Use custom Chrome executable if path is provided in .env
@@ -465,6 +456,26 @@ async function validateUrl(url) {
   } catch (error) {
     return false;
   }
+}
+
+/**
+ * Playwright launch arguments tuned for each platform.
+ * Linux still needs the sandbox flags, but Windows and macOS fail to boot
+ * when `--single-process`/`--no-zygote` are forced.
+ */
+function buildChromiumLaunchArgs() {
+  const args = [
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--disable-gpu',
+  ];
+
+  if (process.platform === 'linux') {
+    args.push('--no-sandbox', '--disable-setuid-sandbox', '--no-zygote', '--single-process');
+  }
+
+  return args;
 }
 
 module.exports = {

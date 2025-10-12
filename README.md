@@ -68,8 +68,29 @@ An intelligent keyword research tool that combines web scraping, AI-powered keyw
 
    ```bash
    cd python-ads-service
-   PYTHON_SERVICE_PORT=5001 python3 app.py
    ```
+
+   - **macOS / Linux**
+
+     ```bash
+     PYTHON_SERVICE_PORT=5001 python3 app.py
+     ```
+
+   - **Windows PowerShell**
+
+     ```powershell
+     $env:PYTHON_SERVICE_PORT=5001
+     python app.py
+     ```
+
+   - **Windows Command Prompt**
+
+     ```cmd
+     set PYTHON_SERVICE_PORT=5001
+     python app.py
+     ```
+
+   > 💡 Windows users with multiple Python installations can also run `py -3 app.py` after setting the environment variable in the same terminal.
 
    **Terminal 2 – Node.js server (port 3000)**
 
