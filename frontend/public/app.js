@@ -525,7 +525,6 @@ function displayResults(data) {
         <div class="cluster-title-wrap">
           <div class="cluster-title">${cluster.pillarTopic}</div>
         </div>
-        <div class="cluster-badge" aria-label="${cluster.keywords?.length || 0} keywords available">${cluster.keywords?.length || 0} keywords</div>
       </div>
       ${cluster.aiDescription ? `<div class="cluster-description">${cluster.aiDescription}</div>` : ''}
       <div class="cluster-metrics">
@@ -590,10 +589,10 @@ function toggleCluster(index) {
     content.style.display = willShow ? 'block' : 'none';
     if (header) {
       header.setAttribute('aria-expanded', String(willShow));
-      header.classList.toggle('is-open', willShow);
     }
     if (toggleButton) {
       toggleButton.setAttribute('aria-expanded', String(willShow));
+      toggleButton.classList.toggle('is-open', willShow);
       toggleButton.textContent = willShow ? 'Hide keywords' : 'Show keywords';
     }
   }
