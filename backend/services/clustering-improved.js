@@ -134,6 +134,9 @@ const STOP_WORDS = new Set([
 ]);
 const STEMMED_STOP_WORDS = new Set([...STOP_WORDS].map(word => stemmer.stem(word)));
 
+const DEFAULT_RELEVANCE_SCORE = 0.65;
+const CLEAR_KEYWORD_RELEVANCE_THRESHOLD = 0.01;
+
 /**
  * Enhanced clustering with multiple algorithms and semantic similarity
  */
@@ -158,15 +161,9 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
 
   if (keywordData.length < minClusterSize) {
     // Too few keywords for clustering
-    return [{
-      id: 1,
-      pillarTopic: keywordData[0]?.keyword || 'Main Topic',
-      keywords: keywordData,
-      totalSearchVolume: calculateTotalVolume(keywordData),
-      avgCompetition: calculateAvgCompetition(keywordData),
-      clusterValueScore: calculateClusterValue(keywordData),
-      algorithm: 'single',
-    }];
+    const singleCluster = createClusterObject(1, keywordData, 'single');
+    const relevanceResult = applyRelevanceScores([singleCluster], websiteContext, { allowRemoval: true });
+    return relevanceResult.clusters.length > 0 ? relevanceResult.clusters : [singleCluster];
   }
 
   console.log(`[Clustering] Processing ${keywordData.length} keywords with ${algorithm} algorithm`);
@@ -203,6 +200,27 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
     // Ensure each keyword only belongs to one cluster before AI review
     clusters = ensureUniqueKeywords(clusters);
     clusters = clusters.filter(c => c.keywords.length >= minClusterSize);
+
+    const relevanceResult = applyRelevanceScores(clusters, websiteContext, { allowRemoval: true });
+    clusters = relevanceResult.clusters;
+
+    if (relevanceResult.contextAvailable) {
+      if (relevanceResult.removedClusters > 0) {
+        console.log(
+          `[Clustering] Removed ${relevanceResult.removedClusters} clusters that were irrelevant to the page context.`
+        );
+      }
+      if (relevanceResult.removedKeywords > 0) {
+        console.log(
+          `[Clustering] Filtered ${relevanceResult.removedKeywords} keywords that clearly did not match the page intent.`
+        );
+      }
+    }
+
+    if (clusters.length === 0) {
+      console.warn('[Clustering] No relevant clusters remained after relevance filtering.');
+      return [];
+    }
 
     // Sort clusters by value score
     clusters = sortAndRankClusters(clusters);
@@ -257,6 +275,9 @@ async function clusterKeywords(keywordData, websiteContext = {}, options = {}) {
     // Final safety pass to guarantee keyword uniqueness
     clusters = ensureUniqueKeywords(clusters);
 
+    const postAiRelevance = applyRelevanceScores(clusters, websiteContext, { allowRemoval: false });
+    clusters = sortAndRankClusters(postAiRelevance.clusters);
+
     // Ensure every cluster ships with human-readable insights even without AI
     return applyClusterNarratives(clusters, websiteContext);
 
@@ -301,7 +322,7 @@ async function clusterWithKMeans(keywordData, options = {}) {
   const clusters = [];
   let clusterId = 1;
 
-  for (const [_, keywords] of clusterMap) {
+  for (const keywords of clusterMap.values()) {
     if (keywords.length > 0) {
       clusters.push(createClusterObject(clusterId++, keywords, 'kmeans'));
     }
@@ -710,7 +731,7 @@ function splitCluster(cluster) {
   });
 
   let id = cluster.id * 10; // Sub-cluster IDs
-  for (const [_, keywords] of subClusterMap) {
+  for (const keywords of subClusterMap.values()) {
     if (keywords.length >= MIN_CLUSTER_SIZE) {
       subClusters.push(createClusterObject(id++, keywords, 'hybrid-split'));
     }
@@ -1040,21 +1061,364 @@ function findBestClusterForKeyword(keyword, clusters) {
 }
 
 /**
+ * Apply relevance scoring to clusters and optionally filter irrelevant entries
+ */
+function applyRelevanceScores(clusters, websiteContext = {}, options = {}) {
+  const { allowRemoval = true } = options || {};
+
+  if (!Array.isArray(clusters) || clusters.length === 0) {
+    return {
+      clusters: [],
+      removedClusters: 0,
+      removedKeywords: 0,
+      contextAvailable: false,
+    };
+  }
+
+  const contextInfo = buildRelevanceContext(websiteContext);
+  const hasContext = contextInfo.tokens.size > 0;
+  const processed = [];
+  let removedClusters = 0;
+  let removedKeywords = 0;
+
+  clusters.forEach(cluster => {
+    if (!cluster) {
+      return;
+    }
+
+    const enriched = enrichClusterWithRelevance(cluster, contextInfo, {
+      allowRemoval,
+      hasContext,
+    });
+
+    if (!enriched) {
+      removedClusters += 1;
+      return;
+    }
+
+    if (allowRemoval) {
+      removedKeywords += enriched.removedKeywords || 0;
+    }
+
+    const meetsSizeRequirement = allowRemoval
+      ? enriched.keywordCount >= MIN_CLUSTER_SIZE
+      : enriched.keywordCount > 0;
+
+    if (!meetsSizeRequirement) {
+      removedClusters += 1;
+      return;
+    }
+
+    processed.push(enriched);
+  });
+
+  return {
+    clusters: processed,
+    removedClusters,
+    removedKeywords,
+    contextAvailable: hasContext,
+  };
+}
+
+function enrichClusterWithRelevance(cluster, contextInfo, { allowRemoval, hasContext }) {
+  const keywords = Array.isArray(cluster?.keywords) ? [...cluster.keywords] : [];
+
+  if (keywords.length === 0) {
+    if (allowRemoval && hasContext) {
+      return null;
+    }
+
+    const fallbackRelevance = typeof cluster?.relevanceScore === 'number'
+      ? Math.max(0, Math.min(1, cluster.relevanceScore))
+      : DEFAULT_RELEVANCE_SCORE;
+
+    return {
+      ...cluster,
+      keywords: [],
+      keywordCount: 0,
+      totalSearchVolume: 0,
+      avgSearchVolume: 0,
+      avgCompetition: 'unknown',
+      relevanceScore: Math.round(fallbackRelevance * 100) / 100,
+      clusterValueScore: calculateClusterValue([], { relevanceScore: fallbackRelevance }),
+      removedKeywords: allowRemoval ? (cluster?.keywordCount || 0) : (cluster?.removedKeywords || 0),
+    };
+  }
+
+  const allScores = [];
+  const allWeights = [];
+  const keptKeywords = [];
+  const keptScores = [];
+  const keptWeights = [];
+  let removedKeywords = 0;
+
+  keywords.forEach(keywordObj => {
+    const keywordText = typeof keywordObj?.keyword === 'string' ? keywordObj.keyword : '';
+    const keywordTokens = keywordText ? tokenizeForRelevance(keywordText) : new Set();
+    const keywordScore = hasContext && keywordText
+      ? scoreKeywordRelevance(keywordText, contextInfo, keywordTokens)
+      : (keywordText ? DEFAULT_RELEVANCE_SCORE : 0);
+    const keywordWeight = Math.max(1, Math.log10((keywordObj?.searchVolume || 0) + 10));
+
+    allScores.push(keywordScore);
+    allWeights.push(keywordWeight);
+
+    const shouldKeep = !allowRemoval
+      || !hasContext
+      || keywordScore > CLEAR_KEYWORD_RELEVANCE_THRESHOLD
+      || keywordTokens.size === 0;
+
+    if (shouldKeep) {
+      keptKeywords.push(keywordObj);
+      keptScores.push(keywordScore);
+      keptWeights.push(keywordWeight);
+    } else {
+      removedKeywords += 1;
+    }
+  });
+
+  const workingKeywords = allowRemoval ? keptKeywords : keywords;
+  const workingScores = allowRemoval ? keptScores : allScores;
+  const workingWeights = allowRemoval ? keptWeights : allWeights;
+
+  if (workingKeywords.length === 0) {
+    if (hasContext) {
+      return null;
+    }
+
+    const fallbackRelevance = typeof cluster?.relevanceScore === 'number'
+      ? Math.max(0, Math.min(1, cluster.relevanceScore))
+      : DEFAULT_RELEVANCE_SCORE;
+
+    return {
+      ...cluster,
+      keywords: [],
+      keywordCount: 0,
+      totalSearchVolume: 0,
+      avgSearchVolume: 0,
+      avgCompetition: 'unknown',
+      relevanceScore: Math.round(fallbackRelevance * 100) / 100,
+      clusterValueScore: calculateClusterValue([], { relevanceScore: fallbackRelevance }),
+      removedKeywords: allowRemoval ? removedKeywords : (cluster?.removedKeywords || 0),
+    };
+  }
+
+  const sortedKeywords = [...workingKeywords].sort((a, b) => (b?.searchVolume || 0) - (a?.searchVolume || 0));
+  const totalSearchVolume = calculateTotalVolume(sortedKeywords);
+  const keywordCount = sortedKeywords.length;
+  const avgSearchVolume = keywordCount > 0 ? Math.round(totalSearchVolume / keywordCount) : 0;
+  const avgCompetition = calculateAvgCompetition(sortedKeywords);
+
+  let relevanceScore;
+  if (!hasContext) {
+    const existing = typeof cluster?.relevanceScore === 'number'
+      ? cluster.relevanceScore
+      : DEFAULT_RELEVANCE_SCORE;
+    relevanceScore = Math.max(0, Math.min(1, existing || DEFAULT_RELEVANCE_SCORE));
+  } else if (workingScores.length === 0) {
+    relevanceScore = 0;
+  } else {
+    const totalWeight = workingWeights.reduce((sum, weight) => sum + weight, 0) || workingScores.length;
+    const weightedScore = workingScores.reduce(
+      (sum, score, index) => sum + (score * (workingWeights[index] || 1)),
+      0
+    );
+    const averageScore = weightedScore / totalWeight;
+    const bestScore = Math.max(...workingScores);
+    relevanceScore = Math.min(1, (averageScore * 0.7) + (bestScore * 0.3));
+  }
+
+  const normalizedRelevance = Math.max(0, Math.min(1, relevanceScore));
+  const clusterValueScore = calculateClusterValue(sortedKeywords, { relevanceScore: normalizedRelevance });
+
+  const pillarTopic = sortedKeywords.length > 0
+    ? selectPillarTopic(sortedKeywords)
+    : cluster.pillarTopic;
+
+  return {
+    ...cluster,
+    pillarTopic,
+    keywords: sortedKeywords,
+    keywordCount,
+    totalSearchVolume,
+    avgSearchVolume,
+    avgCompetition,
+    relevanceScore: Math.round(normalizedRelevance * 100) / 100,
+    clusterValueScore,
+    removedKeywords: allowRemoval ? removedKeywords : (cluster?.removedKeywords || 0),
+  };
+}
+
+function buildRelevanceContext(websiteContext = {}) {
+  if (!websiteContext || typeof websiteContext !== 'object') {
+    return { normalizedText: '', tokens: new Set() };
+  }
+
+  const contextParts = [];
+  const directFields = [
+    'title',
+    'description',
+    'url',
+    'businessName',
+    'brand',
+    'topic',
+    'category',
+    'industry',
+  ];
+
+  directFields.forEach(field => {
+    const value = websiteContext[field];
+    if (typeof value === 'string' && value.trim()) {
+      contextParts.push(value);
+    }
+  });
+
+  const listFields = [
+    'focusKeywords',
+    'primaryKeywords',
+    'topics',
+    'targetKeywords',
+    'keywords',
+    'labels',
+    'tags',
+  ];
+
+  listFields.forEach(field => {
+    const value = websiteContext[field];
+    if (Array.isArray(value)) {
+      value.forEach(item => {
+        if (typeof item === 'string' && item.trim()) {
+          contextParts.push(item);
+        }
+      });
+    } else if (typeof value === 'string' && value.trim()) {
+      contextParts.push(value);
+    }
+  });
+
+  if (Array.isArray(websiteContext.pages)) {
+    websiteContext.pages.forEach(page => {
+      if (!page || typeof page !== 'object') return;
+      if (typeof page.title === 'string' && page.title.trim()) {
+        contextParts.push(page.title);
+      }
+      if (typeof page.metaDescription === 'string' && page.metaDescription.trim()) {
+        contextParts.push(page.metaDescription);
+      }
+      if (typeof page.url === 'string' && page.url.trim()) {
+        contextParts.push(page.url);
+      }
+    });
+  }
+
+  const normalizedText = contextParts
+    .map(part => part && part.toString ? part.toString() : '')
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return {
+    normalizedText,
+    tokens: tokenizeForRelevance(normalizedText),
+  };
+}
+
+function tokenizeForRelevance(text) {
+  if (!text || typeof text !== 'string') {
+    return new Set();
+  }
+
+  const normalized = text
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/giu, ' ');
+
+  const rawTokens = normalized.split(/\s+/u).filter(Boolean);
+  const tokens = new Set();
+
+  rawTokens.forEach(token => {
+    if (!token || STOP_WORDS.has(token)) {
+      return;
+    }
+
+    const stemmed = stemmer.stem(token);
+    if (!stemmed || stemmed.length <= 1) {
+      return;
+    }
+
+    if (STEMMED_STOP_WORDS.has(stemmed)) {
+      return;
+    }
+
+    tokens.add(stemmed);
+  });
+
+  return tokens;
+}
+
+function scoreKeywordRelevance(keyword, contextInfo, keywordTokens = null) {
+  if (!contextInfo || !(contextInfo.tokens instanceof Set)) {
+    return 0;
+  }
+
+  const normalizedKeyword = typeof keyword === 'string' ? keyword.toLowerCase() : '';
+  const tokens = keywordTokens || tokenizeForRelevance(normalizedKeyword);
+
+  if (!tokens || tokens.size === 0) {
+    return 0;
+  }
+
+  const matches = [...tokens].filter(token => contextInfo.tokens.has(token));
+  if (matches.length === 0) {
+    return 0;
+  }
+
+  const matchRatio = matches.length / tokens.size;
+  const unionSize = new Set([...tokens, ...contextInfo.tokens]).size || tokens.size;
+  const jaccard = unionSize > 0 ? matches.length / unionSize : matchRatio;
+
+  let score = (matchRatio * 0.7) + (jaccard * 0.3);
+
+  if (contextInfo.normalizedText && normalizedKeyword && contextInfo.normalizedText.includes(normalizedKeyword)) {
+    score = Math.max(score, 0.9);
+  } else if (matchRatio >= 0.6 && tokens.size <= 3) {
+    score = Math.max(score, 0.75);
+  }
+
+  return Math.min(1, score);
+}
+
+/**
  * Sort and rank clusters
  */
 function sortAndRankClusters(clusters) {
-  return clusters.sort((a, b) => {
-    // Primary: Total search volume (60% weight)
-    const volumeDiff = (b.totalSearchVolume - a.totalSearchVolume) * 0.6;
+  if (!Array.isArray(clusters)) {
+    return [];
+  }
 
-    // Secondary: Cluster value score (30% weight)
-    const scoreDiff = (b.clusterValueScore - a.clusterValueScore) * 0.3;
+  const sorted = [...clusters].sort((a, b) => {
+    const scoreDiff = (b?.clusterValueScore || 0) - (a?.clusterValueScore || 0);
+    if (Math.abs(scoreDiff) > 0.0001) {
+      return scoreDiff;
+    }
 
-    // Tertiary: Number of keywords (10% weight)
-    const sizeDiff = (b.keywords.length - a.keywords.length) * 0.1;
+    const relevanceDiff = (b?.relevanceScore || 0) - (a?.relevanceScore || 0);
+    if (Math.abs(relevanceDiff) > 0.0001) {
+      return relevanceDiff;
+    }
 
-    return volumeDiff + scoreDiff + sizeDiff;
+    const volumeDiff = (b?.totalSearchVolume || 0) - (a?.totalSearchVolume || 0);
+    if (volumeDiff !== 0) {
+      return volumeDiff;
+    }
+
+    return ((b?.keywords?.length || 0) - (a?.keywords?.length || 0));
   });
+
+  return sorted.map((cluster, index) => ({
+    ...cluster,
+    rank: index + 1,
+  }));
 }
 
 /**
@@ -1075,7 +1439,7 @@ function fallbackClustering(keywordData) {
   const clusters = [];
   let id = 1;
 
-  for (const [_, keywords] of groups) {
+  for (const keywords of groups.values()) {
     if (keywords.length >= MIN_CLUSTER_SIZE) {
       clusters.push(createClusterObject(id++, keywords, 'fallback'));
     }
@@ -1125,34 +1489,43 @@ function calculateAvgCompetition(keywords) {
 /**
  * Calculate cluster value score
  */
-function calculateClusterValue(keywords) {
-  if (keywords.length === 0) return 0;
+function calculateClusterValue(keywords, { relevanceScore = DEFAULT_RELEVANCE_SCORE } = {}) {
+  if (!Array.isArray(keywords) || keywords.length === 0) {
+    return 0;
+  }
 
   const totalVolume = calculateTotalVolume(keywords);
-  const avgVolume = totalVolume / keywords.length;
+  const avgVolume = keywords.length > 0 ? totalVolume / keywords.length : 0;
+
+  const totalVolumeScore = Math.min(40, Math.log10(totalVolume + 1) * 20);
+  const avgVolumeScore = Math.min(25, Math.log(avgVolume + 1) * 10);
 
   const competitionValues = {
-    low: 3,
+    low: 1,
     medium: 2,
-    high: 1,
+    high: 3,
     unknown: 2,
     unspecified: 2,
   };
 
-  const avgCompetitionValue = keywords.reduce((sum, k) =>
-    sum + (competitionValues[k.competition] || 2), 0
-  ) / keywords.length;
+  const avgCompetitionValue = keywords.reduce((sum, keyword) => (
+    sum + (competitionValues[keyword?.competition] || 2)
+  ), 0) / keywords.length;
 
-  // Volume score (60% weight)
-  const volumeScore = Math.min(60, Math.log(avgVolume + 1) * 15);
+  const competitionNormalized = 1 - Math.min(1, Math.max(0, (avgCompetitionValue - 1) / 2));
+  const competitionScore = Math.max(0, Math.min(20, competitionNormalized * 20));
 
-  // Competition score (25% weight)
-  const competitionScore = avgCompetitionValue * 12.5;
+  const sizeScore = Math.min(10, Math.log1p(keywords.length) * 4);
 
-  // Size bonus (15% weight)
-  const sizeBonus = Math.min(15, keywords.length * 1.5);
+  const normalizedRelevance = Math.max(
+    0,
+    Math.min(1, Number.isFinite(relevanceScore) ? relevanceScore : DEFAULT_RELEVANCE_SCORE)
+  );
+  const relevanceComponent = normalizedRelevance * 25;
 
-  return Math.round(Math.min(100, volumeScore + competitionScore + sizeBonus));
+  const combinedScore = totalVolumeScore + avgVolumeScore + competitionScore + sizeScore + relevanceComponent;
+
+  return Math.round(Math.min(100, Math.max(0, combinedScore)));
 }
 
 module.exports = {

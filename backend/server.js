@@ -95,16 +95,16 @@ app.get('/api/info', (req, res) => {
     version: process.env.npm_package_version || '1.0.0',
     description: 'AI-powered keyword research with Google Ads integration',
     endpoints: {
-      research: {
-        POST: '/api/research - Start a new research job',
-        GET: '/api/research/:jobId - Get job status and results',
-        DELETE: '/api/research/:jobId - Cancel or delete a job',
-        EXPORT: '/api/research/:jobId/export - Export results (csv/json)',
-      },
-      config: {
-        GET: '/api/research/config/countries - Get available countries',
-        GET: '/api/research/config/languages - Get available languages',
-      },
+      research: [
+        { method: 'POST', path: '/api/research', description: 'Start a new research job' },
+        { method: 'GET', path: '/api/research/:jobId', description: 'Get job status and results' },
+        { method: 'DELETE', path: '/api/research/:jobId', description: 'Cancel or delete a job' },
+        { method: 'GET', path: '/api/research/:jobId/export', description: 'Export results (csv/json)' },
+      ],
+      config: [
+        { method: 'GET', path: '/api/research/config/countries', description: 'Get available countries' },
+        { method: 'GET', path: '/api/research/config/languages', description: 'Get available languages' },
+      ],
     },
     features: {
       webScraping: true,
@@ -131,7 +131,7 @@ app.get('*', (req, res) => {
 });
 
 // Global error handling middleware
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('[Error]', err);
 
   // Don't leak error details in production
@@ -153,7 +153,7 @@ app.use((err, req, res, next) => {
 let isShuttingDown = false;
 
 // Graceful shutdown handler
-function gracefulShutdown(signal) {
+function gracefulShutdown(_signal) {
   if (isShuttingDown) {
     return;
   }

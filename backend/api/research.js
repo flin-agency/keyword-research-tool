@@ -47,7 +47,7 @@ function rateLimiter(req, res, next) {
  * Input validation middleware
  */
 function validateInput(req, res, next) {
-  const { url, country, language } = req.body;
+  const { url } = req.body;
 
   // Validate URL
   if (!url) {
@@ -217,7 +217,7 @@ router.get('/:jobId', (req, res) => {
   }
 
   // Don't send internal metadata to client
-  const { metadata, ...publicJob } = job;
+  const { metadata: _metadata, ...publicJob } = job;
 
   res.json(publicJob);
 });
