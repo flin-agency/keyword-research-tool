@@ -147,7 +147,7 @@ const clusters = await clustering.clusterKeywords(keywordData, websiteContext);
 ### Gemini API Pricing (Free Tier)
 
 - **Free quota**: 15 requests/minute, 1,500 requests/day
-- **Model**: gemini-2.0-flash-exp (experimental, free)
+- **Model**: gemini-2.5-flash (flash tier, optimized for speed)
 - **Cost**: $0 for basic usage
 
 ### Typical Usage Per Research
@@ -210,7 +210,7 @@ Target audience: Business owners and marketing managers
 
 ```bash
 # Test your API key
-curl https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=YOUR_API_KEY \
+curl https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=YOUR_API_KEY \
   -H 'Content-Type: application/json' \
   -d '{"contents":[{"parts":[{"text":"Hello"}]}]}'
 ```
@@ -255,7 +255,7 @@ Planned features:
 GEMINI_API_KEY=your_key_here
 
 # Optional: Configure which model to use
-GEMINI_MODEL=gemini-2.0-flash-exp  # Default
+GEMINI_MODEL=gemini-2.5-flash  # Default
 
 # Optional: Number of clusters to enhance
 GEMINI_ENHANCE_LIMIT=5  # Default
